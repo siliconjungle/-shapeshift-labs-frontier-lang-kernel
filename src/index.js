@@ -240,12 +240,15 @@ export function classifyMerge(base, left, right) {
     reasons.push(`Right patch base hash ${right.baseHash} does not match current base ${baseHash}`);
   }
 
+  validatePatchAgainstBase(base, left, "Left", reasons);
+  validatePatchAgainstBase(base, right, "Right", reasons);
+
   const leftSummary = summarizePatch(left);
   const rightSummary = summarizePatch(right);
   const overlappingNodeIds = intersection(leftSummary.nodeIds, rightSummary.nodeIds);
   const overlappingRegions = intersection(leftSummary.regions, rightSummary.regions);
   const overlappingEffects = intersection(leftSummary.effects, rightSummary.effects);
-  const evidence = [...(left.evidence ?? []), ...(right.evidence ?? [])];
+  const evidence = [...collectPatchEvidence(left), ...collectPatchEvidence(right)];
   const failedEvidence = evidence.filter((record) => record.status === "failed");
 
   if (reasons.length > 0) {
@@ -348,6 +351,14 @@ export function classifyMerge(base, left, right) {
   });
 }
 
+function validatePatchAgainstBase(base, patch, label, reasons) {
+  try {
+    applySemanticPatch(base, patch);
+  } catch (error) {
+    reasons.push(`${label} patch cannot be applied to base: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function stripHistory(document) {
   const { history: _history, ...rest } = document;
   return rest;
@@ -424,6 +435,16 @@ function summarizePatch(patch) {
     regions: unique(regions),
     effects: unique(effects)
   };
+}
+
+function collectPatchEvidence(patch) {
+  const evidence = [...(patch.evidence ?? [])];
+  for (const operation of patch.operations) {
+    if (operation.op === "addEvidence") {
+      evidence.push(operation.evidence);
+    }
+  }
+  return evidence;
 }
 
 function withReplayGate(base, left, right, admission) {
@@ -511,4 +532,3 @@ function ordinalCompare(left, right) {
   }
   return 0;
 }
-
