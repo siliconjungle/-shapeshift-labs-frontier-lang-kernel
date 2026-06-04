@@ -1,0 +1,48 @@
+{
+  "name": "@shapeshift-labs/frontier-lang-kernel",
+  "version": "0.1.0",
+  "description": "Runtime-neutral semantic source graph, patch, replay, hashing, and merge-admission kernel for Frontier Lang.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node test/smoke.mjs",
+    "prepare": "npm run build",
+    "prepack": "npm test"
+  },
+  "keywords": [
+    "frontier",
+    "semantic-merge",
+    "patch",
+    "replay",
+    "compiler"
+  ],
+  "author": "ShapeShift Labs",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/siliconjungle/-shapeshift-labs-frontier-lang-kernel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/siliconjungle/-shapeshift-labs-frontier-lang-kernel/issues"
+  },
+  "homepage": "https://github.com/siliconjungle/-shapeshift-labs-frontier-lang-kernel#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {}
+}
