@@ -432,6 +432,81 @@ export function createSemanticMergeCandidateFromImport(input) {
   });
 }
 
+export function createNativeAstMergeCandidate(input) {
+  const semanticIndex = input.semanticIndex;
+  const nativeAst = input.nativeAst;
+  const sourceMaps = input.sourceMaps ?? [];
+  const language = input.language ?? nativeAst?.language;
+  const sourcePath = input.sourcePath ?? nativeAst?.sourcePath;
+  const sourceMapTouchIds = collectSourceMapSemanticTouchIds(sourceMaps);
+  const touchedSymbols = collectTouchedSemanticMergeSymbols(semanticIndex, sourceMapTouchIds, true);
+  const touchedSemanticNodes = collectTouchedSemanticMergeNodes(input.document, semanticIndex, touchedSymbols, sourceMapTouchIds, false);
+  const nativeSpans = uniqueById([
+    ...collectSemanticMergeNativeSpans({
+      semanticIndex,
+      nativeAst,
+      touchedSymbols,
+      semanticTouchIds: sourceMapTouchIds,
+      sourcePath,
+      language,
+      includeAll: true
+    }),
+    ...collectSourceMapNativeSpans(sourceMaps, { sourcePath, language })
+  ]);
+  const subtreeSummary = collectNativeAstSubtreeConflictKeys(nativeAst, {
+    sourcePath,
+    maxKeys: input.maxSubtreeKeys ?? 100
+  });
+  const signatureKeys = collectSemanticSignatureConflictKeys(semanticIndex, language);
+  const evidence = uniqueEvidence(input.evidence ?? []);
+  const losses = uniqueById([
+    ...(input.losses ?? []),
+    ...(nativeAst?.losses ?? [])
+  ]);
+  const readiness = input.readiness
+    ? { readiness: input.readiness, reasons: input.reasons ?? [] }
+    : inferNativeAstMergeReadiness({
+      evidence,
+      losses,
+      touchedSymbols,
+      touchedSemanticNodes,
+      nativeSpans,
+      subtreeSummary
+    });
+
+  return createSemanticMergeCandidateRecord({
+    id: input.id ?? `merge-candidate:${nativeAst?.id ?? semanticIndex?.id ?? sourceMaps[0]?.id ?? "native-ast"}`,
+    language,
+    sourcePath,
+    touchedSymbols,
+    touchedSemanticNodes,
+    nativeSpans,
+    conflictKeys: collectSemanticMergeConflictKeys({
+      touchedSymbols,
+      touchedSemanticNodes,
+      nativeSpans,
+      extra: [
+        ...subtreeSummary.conflictKeys,
+        ...signatureKeys
+      ]
+    }),
+    readiness: readiness.readiness,
+    reasons: readiness.reasons,
+    evidence,
+    metadata: {
+      source: "native-ast-merge-candidate",
+      nativeAstId: nativeAst?.id,
+      semanticIndexId: semanticIndex?.id,
+      sourceMapIds: sourceMaps.map((sourceMap) => sourceMap.id),
+      subtreeKeyCount: subtreeSummary.conflictKeys.length,
+      duplicateSubtreeHashes: subtreeSummary.duplicateHashes,
+      truncatedSubtreeKeys: subtreeSummary.truncated,
+      signatureKeyCount: signatureKeys.length,
+      ...(input.metadata ?? {})
+    }
+  });
+}
+
 export function createPatch(input) {
   return {
     ...input,
@@ -1141,8 +1216,162 @@ function collectSemanticMergeConflictKeys(input) {
     ...(input.touchedSemanticNodes ?? []).map((node) => node.conflictKey ?? `node:${node.id}`),
     ...(input.nativeSpans ?? []).map((span) => span.conflictKey),
     ...(input.regions ?? []).map((region) => `region:${region}`),
-    ...(input.effects ?? []).map((effect) => `effect:${effect}`)
+    ...(input.effects ?? []).map((effect) => `effect:${effect}`),
+    ...(input.extra ?? [])
   ].filter(Boolean)).sort(ordinalCompare);
+}
+
+function collectSourceMapSemanticTouchIds(sourceMaps) {
+  const ids = [];
+  for (const sourceMap of sourceMaps ?? []) {
+    for (const mapping of sourceMap.mappings ?? []) {
+      if (mapping.semanticNodeId) ids.push(mapping.semanticNodeId);
+      if (mapping.semanticSymbolId) ids.push(mapping.semanticSymbolId);
+      if (mapping.semanticOccurrenceId) ids.push(mapping.semanticOccurrenceId);
+      if (mapping.nativeAstNodeId) ids.push(mapping.nativeAstNodeId);
+    }
+  }
+  return new Set(unique(ids));
+}
+
+function collectSourceMapNativeSpans(sourceMaps, input) {
+  const spans = [];
+  for (const sourceMap of sourceMaps ?? []) {
+    for (const mapping of sourceMap.mappings ?? []) {
+      const span = mapping.sourceSpan ?? mapping.generatedSpan;
+      if (!span) continue;
+      const normalizedSpan = spanWithFallbackPath(span, sourceMap.sourcePath ?? input.sourcePath);
+      spans.push({
+        id: `sourcemap:${sourceMap.id}:${mapping.id}`,
+        sourceId: normalizedSpan.sourceId,
+        path: normalizedSpan.path,
+        language: input.language,
+        nativeAstNodeId: mapping.nativeAstNodeId,
+        semanticNodeId: mapping.semanticNodeId,
+        symbolId: mapping.semanticSymbolId,
+        span: normalizedSpan,
+        conflictKey: nativeSpanConflictKey(normalizedSpan, mapping.nativeAstNodeId ?? mapping.id),
+        metadata: {
+          sourceMapId: sourceMap.id,
+          mappingId: mapping.id,
+          precision: mapping.precision,
+          generatedSpan: mapping.generatedSpan,
+          mergeCandidateId: mapping.mergeCandidateId
+        }
+      });
+    }
+  }
+  return uniqueById(spans);
+}
+
+function collectNativeAstSubtreeConflictKeys(nativeAst, options = {}) {
+  if (!nativeAst?.nodes) {
+    return { conflictKeys: [], duplicateHashes: [], truncated: false };
+  }
+  const hashesByNodeId = new Map();
+  const counts = new Map();
+  for (const nodeId of Object.keys(nativeAst.nodes).sort(ordinalCompare)) {
+    const hash = nativeAstSubtreeHash(nativeAst, nodeId, hashesByNodeId, new Set());
+    counts.set(hash, (counts.get(hash) ?? 0) + 1);
+  }
+  const conflictKeys = [];
+  const duplicateHashes = [];
+  const path = options.sourcePath ?? nativeAst.sourcePath ?? "unknown";
+  for (const [nodeId, hash] of [...hashesByNodeId.entries()].sort(([left], [right]) => ordinalCompare(left, right))) {
+    if ((counts.get(hash) ?? 0) > 1) {
+      duplicateHashes.push(hash);
+      continue;
+    }
+    conflictKeys.push(`ast-subtree:${path}:${hash}:${nodeId}`);
+    if (conflictKeys.length >= options.maxKeys) {
+      return { conflictKeys, duplicateHashes: unique(duplicateHashes).sort(ordinalCompare), truncated: true };
+    }
+  }
+  return { conflictKeys, duplicateHashes: unique(duplicateHashes).sort(ordinalCompare), truncated: false };
+}
+
+function nativeAstSubtreeHash(nativeAst, nodeId, cache, seen) {
+  if (cache.has(nodeId)) {
+    return cache.get(nodeId);
+  }
+  if (seen.has(nodeId)) {
+    return hashSemanticValue({ cycle: nodeId });
+  }
+  seen.add(nodeId);
+  const node = nativeAst.nodes[nodeId] ?? {};
+  const children = (node.children ?? []).map((childId) => nativeAstSubtreeHash(nativeAst, childId, cache, seen));
+  seen.delete(nodeId);
+  const hash = hashSemanticValue({
+    kind: node.kind,
+    languageKind: node.languageKind,
+    value: node.value,
+    fields: node.fields,
+    children
+  });
+  cache.set(nodeId, hash);
+  return hash;
+}
+
+function collectSemanticSignatureConflictKeys(semanticIndex, language) {
+  const signatureFactsBySubject = new Map();
+  for (const fact of semanticIndex?.facts ?? []) {
+    if (fact.predicate === "signatureHash" && typeof fact.value === "string") {
+      signatureFactsBySubject.set(fact.subjectId, fact.value);
+    }
+  }
+  const keys = [];
+  for (const symbol of semanticIndex?.symbols ?? []) {
+    const signatureHash = symbol.signatureHash ?? signatureFactsBySubject.get(symbol.id);
+    if (!signatureHash) continue;
+    keys.push(`sig:${symbol.language ?? language ?? "unknown"}:${symbol.id}:${signatureHash}`);
+  }
+  return unique(keys).sort(ordinalCompare);
+}
+
+function inferNativeAstMergeReadiness(input) {
+  const failedEvidence = input.evidence.filter((record) => record.status === "failed");
+  if (failedEvidence.length > 0) {
+    return {
+      readiness: "blocked",
+      reasons: [`Failed evidence prevents merge: ${failedEvidence.map((record) => record.id).join(", ")}`]
+    };
+  }
+
+  const errorLosses = input.losses.filter((record) => record.severity === "error");
+  if (errorLosses.length > 0) {
+    return {
+      readiness: "blocked",
+      reasons: [`Native AST loss error(s) require repair: ${errorLosses.map((record) => record.id).join(", ")}`]
+    };
+  }
+
+  if (input.touchedSymbols.length === 0 && input.touchedSemanticNodes.length === 0 && input.nativeSpans.length === 0) {
+    return {
+      readiness: "needs-review",
+      reasons: ["Native AST candidate has no symbol, semantic node, or span anchors."]
+    };
+  }
+
+  if (!input.evidence.some((record) => record.status === "passed")) {
+    return {
+      readiness: "needs-review",
+      reasons: ["Native AST candidate has no passed evidence record."]
+    };
+  }
+
+  if (input.losses.length > 0 || input.subtreeSummary.duplicateHashes.length > 0 || input.subtreeSummary.truncated) {
+    return {
+      readiness: "ready-with-losses",
+      reasons: [
+        "Native AST candidate has usable anchors but includes non-blocking loss or ambiguous subtree evidence."
+      ]
+    };
+  }
+
+  return {
+    readiness: "ready",
+    reasons: ["Native AST candidate has deterministic symbol/node/span anchors and passed evidence."]
+  };
 }
 
 function inferSemanticMergeReadiness(input) {

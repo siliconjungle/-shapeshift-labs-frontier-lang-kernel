@@ -219,6 +219,24 @@ const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [todo]
 const patch = createPatch({ id: 'rename_todo', baseHash: hashDocumentBase(document), operations: [{ op: 'renameNode', id: 'ent_todo', name: 'Task' }] });
 ```
 
+## Native AST Merge Keys
+
+Parser adapters can turn native AST, semantic-index, and source-map evidence into merge-admission keys without adding parser dependencies to the kernel:
+
+```js
+import { createNativeAstMergeCandidate } from '@shapeshift-labs/frontier-lang-kernel';
+
+const candidate = createNativeAstMergeCandidate({
+  document,
+  nativeAst,
+  semanticIndex,
+  sourceMaps,
+  evidence: [{ id: 'adapter-smoke', kind: 'test', status: 'passed' }]
+});
+
+console.log(candidate.conflictKeys); // symbol/node/native/span/subtree/signature keys
+```
+
 ## Package Boundary
 
 - Parser: `@shapeshift-labs/frontier-lang-parser`

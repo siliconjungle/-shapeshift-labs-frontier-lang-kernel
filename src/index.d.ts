@@ -646,6 +646,22 @@ export interface SemanticPatchBundle {
   readonly metadata?: JsonObject;
 }
 
+export interface NativeAstMergeCandidateOptions {
+  readonly id?: string;
+  readonly document?: FrontierLangDocument;
+  readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps?: readonly SourceMapRecord[];
+  readonly language?: FrontierSourceLanguage;
+  readonly sourcePath?: string;
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly readiness?: SemanticMergeReadiness;
+  readonly reasons?: readonly string[];
+  readonly maxSubtreeKeys?: number;
+  readonly metadata?: JsonObject;
+}
+
 export interface ReplayEvent {
   readonly id: string;
   readonly at?: string;
@@ -739,6 +755,7 @@ export declare function createSemanticMergeCandidateFromImport(input: {
   readonly evidence?: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
 }): SemanticMergeCandidateRecord;
+export declare function createNativeAstMergeCandidate(input: NativeAstMergeCandidateOptions): SemanticMergeCandidateRecord;
 export declare function createPatch(input: Omit<SemanticPatchBundle, "kind" | "version">): SemanticPatchBundle;
 export declare function createDocument(input: {
   readonly id: SemanticId;

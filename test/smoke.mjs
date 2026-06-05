@@ -6,6 +6,7 @@ import {
   createDocument,
   createImportResult,
   createNativeAstRecord,
+  createNativeAstMergeCandidate,
   createPatch,
   createSemanticIndexRecord,
   createSemanticMergeCandidateFromImport,
@@ -270,6 +271,26 @@ assert.equal(mergeCandidate.conflictKeys.includes('region:field_title'), true);
 assert.equal(mergeCandidate.conflictKeys.includes('symbol:symbol:Todo'), true);
 assert.equal(mergeCandidate.conflictKeys.some((key) => key.startsWith('native:src/todo.ts:1:1:4:2:native_todo_interface')), true);
 assert.equal(createSemanticMergeCandidateFromImport({ importResult, id: 'merge-candidate:explicit' }).touchedSymbols[0].id, 'symbol:Todo');
+const nativeAstMergeCandidate = createNativeAstMergeCandidate({
+  id: 'merge-candidate:native-ast',
+  document,
+  nativeAst,
+  semanticIndex,
+  sourceMaps: [sourceMap],
+  losses: nativeAst.losses,
+  evidence: [...semanticIndex.evidence, ...sourceMap.evidence]
+});
+assert.equal(nativeAstMergeCandidate.kind, 'frontier.lang.semanticMergeCandidate');
+assert.equal(nativeAstMergeCandidate.readiness, 'ready-with-losses');
+assert.equal(nativeAstMergeCandidate.touchedSymbols[0].id, 'symbol:Todo');
+assert.equal(nativeAstMergeCandidate.touchedSemanticNodes[0].id, 'ent_todo');
+assert.equal(nativeAstMergeCandidate.nativeSpans.some((span) => span.id === 'sourcemap:sourcemap_todo_ts:map_todo_interface'), true);
+assert.equal(nativeAstMergeCandidate.conflictKeys.includes('node:ent_todo'), true);
+assert.equal(nativeAstMergeCandidate.conflictKeys.includes('symbol:symbol:Todo'), true);
+assert.equal(nativeAstMergeCandidate.conflictKeys.includes('sig:typescript:symbol:Todo:fnv1a32:example'), true);
+assert.equal(nativeAstMergeCandidate.conflictKeys.some((key) => key.startsWith('ast-subtree:src/todo.ts:fnv1a32:')), true);
+assert.equal(nativeAstMergeCandidate.metadata.nativeAstId, 'native_ts_todo');
+assert.equal(nativeAstMergeCandidate.metadata.sourceMapIds[0], 'sourcemap_todo_ts');
 assert.match(
   validateDocument(createDocument({ id: 'bad', name: 'Bad', nodes: [
     entityNode({ id: 'bad_entity', name: 'Bad', fields: [
