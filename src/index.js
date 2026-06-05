@@ -1,3 +1,34 @@
+export const NativeAstLossKinds = Object.freeze([
+  "unsupportedSyntax",
+  "unsupportedSemantic",
+  "opaqueNative",
+  "missingTypeInfo",
+  "macroExpansion",
+  "preprocessor",
+  "dynamicRuntime",
+  "unresolvedSymbol",
+  "nonRoundTrippable",
+  "declarationOnlyCoverage",
+  "partialSemanticIndex",
+  "sourceMapApproximation",
+  "sourcePreservation",
+  "conditionalCompilation",
+  "reflection",
+  "macroHygiene",
+  "unsafeFfi",
+  "dynamicDispatch",
+  "generatedCode",
+  "targetLowering"
+]);
+
+export const SourceMapPrecisions = Object.freeze([
+  "exact",
+  "declaration",
+  "line",
+  "estimated",
+  "unknown"
+]);
+
 export function moduleNode(input) {
   return { ...input, kind: "module" };
 }
@@ -69,6 +100,103 @@ export function createSemanticIndexRecord(input) {
     relations: input.relations ?? [],
     facts: input.facts ?? []
   };
+}
+
+export function createSourceMapRecord(input) {
+  return {
+    ...input,
+    kind: "frontier.lang.sourceMap",
+    version: 1,
+    mappings: input.mappings ?? [],
+    evidence: input.evidence ?? []
+  };
+}
+
+export function validateSourceMapRecord(sourceMap, context = {}) {
+  const issues = [];
+  if (sourceMap.kind !== "frontier.lang.sourceMap") {
+    issues.push(`Source map ${sourceMap.id ?? "(unknown)"} has invalid kind`);
+  }
+  if (sourceMap.version !== 1) {
+    issues.push(`Source map ${sourceMap.id ?? "(unknown)"} has unsupported version ${sourceMap.version}`);
+  }
+  if (!sourceMap.id) {
+    issues.push("Source map is missing id");
+  }
+
+  const documentNodeIds = new Set(Object.keys(context.document?.nodes ?? {}));
+  const nativeSourceIds = collectNativeSourceIds(context.document, context.nativeSources);
+  const nativeAstNodeIds = new Set(Object.keys(context.nativeAst?.nodes ?? {}));
+  const symbolIds = new Set((context.semanticIndex?.symbols ?? []).map((symbol) => symbol.id));
+  const occurrenceIds = new Set((context.semanticIndex?.occurrences ?? []).map((occurrence) => occurrence.id));
+  const mergeCandidateIds = new Set((context.mergeCandidates ?? []).map((candidate) => candidate.id));
+  const evidenceIds = new Set([
+    ...(context.evidence ?? []).map((record) => record.id),
+    ...(sourceMap.evidence ?? []).map((record) => record.id),
+    ...(context.semanticIndex?.evidence ?? []).map((record) => record.id),
+    ...(context.mergeCandidates ?? []).flatMap((candidate) => (candidate.evidence ?? []).map((record) => record.id))
+  ]);
+  const lossIds = new Set([
+    ...(context.losses ?? []).map((record) => record.id),
+    ...(context.nativeAst?.losses ?? []).map((record) => record.id)
+  ]);
+  const mappingIds = new Set();
+
+  if (sourceMap.nativeSourceId && nativeSourceIds.size > 0 && !nativeSourceIds.has(sourceMap.nativeSourceId)) {
+    issues.push(`Source map ${sourceMap.id} references missing native source ${sourceMap.nativeSourceId}`);
+  }
+  if (sourceMap.nativeAstId && context.nativeAst && sourceMap.nativeAstId !== context.nativeAst.id) {
+    issues.push(`Source map ${sourceMap.id} references native AST ${sourceMap.nativeAstId} but context contains ${context.nativeAst.id}`);
+  }
+  if (sourceMap.semanticIndexId && context.semanticIndex && sourceMap.semanticIndexId !== context.semanticIndex.id) {
+    issues.push(`Source map ${sourceMap.id} references semantic index ${sourceMap.semanticIndexId} but context contains ${context.semanticIndex.id}`);
+  }
+
+  for (const mapping of sourceMap.mappings ?? []) {
+    if (!mapping?.id) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} has mapping without id`);
+      continue;
+    }
+    if (mappingIds.has(mapping.id)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} has duplicate mapping id ${mapping.id}`);
+    }
+    mappingIds.add(mapping.id);
+    if (!mapping.precision) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} is missing precision`);
+    }
+    if (mapping.semanticNodeId && documentNodeIds.size > 0 && !documentNodeIds.has(mapping.semanticNodeId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing semantic node ${mapping.semanticNodeId}`);
+    }
+    if (mapping.nativeSourceId && nativeSourceIds.size > 0 && !nativeSourceIds.has(mapping.nativeSourceId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing native source ${mapping.nativeSourceId}`);
+    }
+    if (mapping.nativeAstNodeId && nativeAstNodeIds.size > 0 && !nativeAstNodeIds.has(mapping.nativeAstNodeId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing native AST node ${mapping.nativeAstNodeId}`);
+    }
+    if (mapping.semanticSymbolId && symbolIds.size > 0 && !symbolIds.has(mapping.semanticSymbolId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing semantic symbol ${mapping.semanticSymbolId}`);
+    }
+    if (mapping.semanticOccurrenceId && occurrenceIds.size > 0 && !occurrenceIds.has(mapping.semanticOccurrenceId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing semantic occurrence ${mapping.semanticOccurrenceId}`);
+    }
+    if (mapping.mergeCandidateId && mergeCandidateIds.size > 0 && !mergeCandidateIds.has(mapping.mergeCandidateId)) {
+      issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing merge candidate ${mapping.mergeCandidateId}`);
+    }
+    for (const evidenceId of mapping.evidenceIds ?? []) {
+      if (evidenceIds.size > 0 && !evidenceIds.has(evidenceId)) {
+        issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing evidence ${evidenceId}`);
+      }
+    }
+    for (const lossId of mapping.lossIds ?? []) {
+      if (lossIds.size > 0 && !lossIds.has(lossId)) {
+        issues.push(`Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} references missing loss ${lossId}`);
+      }
+    }
+    validateSourceSpan(mapping.sourceSpan, `Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} source span`, issues);
+    validateSourceSpan(mapping.generatedSpan, `Source map ${sourceMap.id ?? "(unknown)"} mapping ${mapping.id} generated span`, issues);
+  }
+
+  return issues;
 }
 
 export function validateSemanticIndexRecord(index) {
@@ -145,6 +273,7 @@ export function createUniversalAstEnvelope(input) {
     version: 1,
     schema: input.schema ?? "frontier.lang.semantic.v1",
     nativeSources,
+    sourceMaps: input.sourceMaps ?? [],
     losses,
     evidence: input.evidence ?? []
   };
@@ -179,6 +308,15 @@ export function validateUniversalAstEnvelope(envelope) {
   if (envelope.semanticIndex) {
     issues.push(...validateSemanticIndexRecord(envelope.semanticIndex).map((issue) => `semanticIndex: ${issue}`));
   }
+  for (const sourceMap of envelope.sourceMaps ?? []) {
+    issues.push(...validateSourceMapRecord(sourceMap, {
+      document: envelope.document,
+      nativeSources: envelope.nativeSources,
+      semanticIndex: envelope.semanticIndex,
+      losses: envelope.losses,
+      evidence: envelope.evidence
+    }).map((issue) => `sourceMap: ${issue}`));
+  }
   return issues;
 }
 
@@ -195,6 +333,7 @@ export function createImportResult(input) {
     ...input,
     kind: "frontier.lang.importResult",
     version: 1,
+    sourceMaps: input.sourceMaps ?? input.universalAst?.sourceMaps ?? [],
     losses: input.losses ?? [],
     evidence: input.evidence ?? []
   };
@@ -1224,6 +1363,38 @@ function duplicateValues(values) {
     seen.add(value);
   }
   return duplicates;
+}
+
+function collectNativeSourceIds(document, nativeSources) {
+  return new Set([
+    ...(nativeSources ?? []).map((source) => source.id),
+    ...Object.values(document?.nodes ?? {})
+      .filter((node) => node.kind === "nativeSource")
+      .map((node) => node.id)
+  ]);
+}
+
+function validateSourceSpan(span, label, issues) {
+  if (!span) {
+    return;
+  }
+  if (typeof span.start === "number" && typeof span.end === "number" && span.end < span.start) {
+    issues.push(`${label} ends before it starts`);
+  }
+  if (typeof span.startLine === "number" && typeof span.endLine === "number") {
+    if (span.endLine < span.startLine) {
+      issues.push(`${label} end line is before start line`);
+      return;
+    }
+    if (
+      span.endLine === span.startLine &&
+      typeof span.startColumn === "number" &&
+      typeof span.endColumn === "number" &&
+      span.endColumn < span.startColumn
+    ) {
+      issues.push(`${label} end column is before start column`);
+    }
+  }
 }
 
 function collectUniqueIds(records, label, issues) {

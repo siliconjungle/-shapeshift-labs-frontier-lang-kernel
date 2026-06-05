@@ -9,6 +9,7 @@ import {
   createPatch,
   createSemanticIndexRecord,
   createSemanticMergeCandidateFromImport,
+  createSourceMapRecord,
   createUniversalAstEnvelope,
   entityNode,
   effectNode,
@@ -17,13 +18,19 @@ import {
   hashUniversalAstEnvelope,
   latticeNode,
   nativeSourceNode,
+  NativeAstLossKinds,
   replayDocument,
+  SourceMapPrecisions,
   stableUniversalAstJson,
   typeNode,
   validateDocument,
   validateSemanticIndexRecord,
+  validateSourceMapRecord,
   validateUniversalAstEnvelope
 } from '../dist/index.js';
+
+assert.equal(NativeAstLossKinds.includes('sourceMapApproximation'), true);
+assert.equal(SourceMapPrecisions.includes('declaration'), true);
 
 const tagSet = latticeNode({
   id: 'lat_tag_set',
@@ -133,15 +140,92 @@ const semanticIndex = createSemanticIndexRecord({
   evidence: [{ id: 'index_build', kind: 'import', status: 'passed', summary: 'Built symbol index.' }]
 });
 assert.deepEqual(validateSemanticIndexRecord(semanticIndex), []);
+const sourceMap = createSourceMapRecord({
+  id: 'sourcemap_todo_ts',
+  sourcePath: 'src/todo.ts',
+  sourceHash: 'sha256:example',
+  target: { language: 'typescript', platform: 'node', emitPath: 'generated/todo.ts' },
+  targetPath: 'generated/todo.ts',
+  semanticIndexId: 'index_todo',
+  nativeAstId: 'native_ts_todo',
+  nativeSourceId: 'native_source_todo',
+  mappings: [{
+    id: 'map_todo_interface',
+    semanticNodeId: 'ent_todo',
+    nativeSourceId: 'native_source_todo',
+    nativeAstNodeId: 'native_todo_interface',
+    semanticSymbolId: 'symbol:Todo',
+    semanticOccurrenceId: 'occ_todo_def',
+    sourceSpan: { path: 'src/todo.ts', startLine: 1, startColumn: 1, endLine: 4, endColumn: 2 },
+    generatedSpan: {
+      path: 'generated/todo.ts',
+      targetPath: 'generated/todo.ts',
+      generatedName: 'Todo',
+      startLine: 1,
+      startColumn: 1,
+      endLine: 4,
+      endColumn: 2
+    },
+    evidenceIds: ['index_build'],
+    lossIds: ['loss_decorator'],
+    precision: 'declaration'
+  }],
+  evidence: [{ id: 'sourcemap_build', kind: 'import', status: 'passed', summary: 'Linked native interface to semantic entity.' }],
+  metadata: {
+    format: 'source-map-v3',
+    raw: {
+      version: 3,
+      file: 'generated/todo.ts',
+      sources: ['src/todo.ts'],
+      names: ['Todo'],
+      ignoreList: [],
+      mappings: 'AAAA'
+    }
+  }
+});
+assert.deepEqual(validateSourceMapRecord(sourceMap, {
+  document,
+  nativeSources: [nativeTodo],
+  nativeAst,
+  semanticIndex,
+  losses: nativeAst.losses,
+  evidence: [...semanticIndex.evidence, ...sourceMap.evidence]
+}), []);
+assert.match(validateSourceMapRecord(createSourceMapRecord({
+  id: 'bad_sourcemap',
+  mappings: [
+    { id: 'dup', semanticNodeId: 'missing_node', precision: 'exact' },
+    { id: 'dup', sourceSpan: { path: 'src/todo.ts', start: 10, end: 1 }, precision: 'line' }
+  ]
+}), { document }).join('\n'), /duplicate mapping id dup/);
+assert.match(validateSourceMapRecord(createSourceMapRecord({
+  id: 'bad_sourcemap_span',
+  mappings: [{ id: 'bad_span', sourceSpan: { path: 'src/todo.ts', startLine: 4, startColumn: 2, endLine: 1, endColumn: 1 }, precision: 'line' }]
+}), {}).join('\n'), /end line is before start line/);
+const pointSourceMap = createSourceMapRecord({
+  id: 'sourcemap_point',
+  mappings: [{
+    id: 'map_point',
+    sourceSpan: { path: 'src/todo.ts', startLine: 2, startColumn: 5 },
+    generatedSpan: { path: 'generated/todo.ts', startLine: 8, startColumn: 1 },
+    precision: 'exact',
+    metadata: { rawGeneratedLine0: 7, rawGeneratedColumn0: 0, rawSourceLine0: 1, rawSourceColumn0: 4 }
+  }],
+  metadata: { format: 'source-map-v3', sectionOffset: { line: 7, column: 0 } }
+});
+assert.deepEqual(validateSourceMapRecord(pointSourceMap), []);
+assert.equal(pointSourceMap.mappings[0].metadata.rawGeneratedLine0, 7);
 const universalAst = createUniversalAstEnvelope({
   id: 'uast_todo',
   document,
   semanticIndex,
+  sourceMaps: [sourceMap],
   evidence: semanticIndex.evidence
 });
 assert.deepEqual(validateUniversalAstEnvelope(universalAst), []);
 assert.equal(universalAst.nativeSources[0].id, 'native_source_todo');
 assert.equal(universalAst.losses[0].kind, 'unsupportedSyntax');
+assert.equal(universalAst.sourceMaps[0].mappings[0].semanticNodeId, 'ent_todo');
 assert.match(stableUniversalAstJson(universalAst), /frontier\.lang\.universalAst/);
 assert.match(hashUniversalAstEnvelope(universalAst), /^fnv1a32:/);
 const baseHash = hashDocumentBase(document);
@@ -171,6 +255,7 @@ const importResult = createImportResult({
 assert.equal(importResult.nativeAst.nodes.native_todo_interface.kind, 'InterfaceDeclaration');
 assert.equal(importResult.semanticIndex.symbols[0].id, 'symbol:Todo');
 assert.equal(importResult.universalAst.semanticIndex.id, 'index_todo');
+assert.equal(importResult.sourceMaps[0].id, 'sourcemap_todo_ts');
 assert.match(importResult.losses[0].message, /Decorator/);
 assert.equal(importResult.mergeCandidates.length, 1);
 const mergeCandidate = importResult.mergeCandidates[0];

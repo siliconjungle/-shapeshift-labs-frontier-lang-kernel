@@ -54,6 +54,8 @@ export type FrontierSourceLanguage =
   | "kotlin"
   | "csharp"
   | "swift"
+  | "php"
+  | "ruby"
   | "wasm"
   | string;
 
@@ -79,28 +81,49 @@ export interface NativeAstNode {
   readonly metadata?: JsonObject;
 }
 
+export type NativeAstLossKind =
+  | "unsupportedSyntax"
+  | "unsupportedSemantic"
+  | "opaqueNative"
+  | "missingTypeInfo"
+  | "macroExpansion"
+  | "preprocessor"
+  | "dynamicRuntime"
+  | "unresolvedSymbol"
+  | "nonRoundTrippable"
+  | "declarationOnlyCoverage"
+  | "partialSemanticIndex"
+  | "sourceMapApproximation"
+  | "sourcePreservation"
+  | "conditionalCompilation"
+  | "reflection"
+  | "macroHygiene"
+  | "unsafeFfi"
+  | "dynamicDispatch"
+  | "generatedCode"
+  | "targetLowering"
+  | string;
+
 export interface NativeAstLossRecord {
   readonly id: string;
   readonly severity: "info" | "warning" | "error";
   readonly phase?: "read" | "filter" | "write" | "project" | "merge" | string;
   readonly sourceFormat?: string;
   readonly targetFormat?: string;
-  readonly kind:
-    | "unsupportedSyntax"
-    | "unsupportedSemantic"
-    | "opaqueNative"
-    | "missingTypeInfo"
-    | "macroExpansion"
-    | "preprocessor"
-    | "dynamicRuntime"
-    | "unresolvedSymbol"
-    | "nonRoundTrippable"
-    | string;
+  readonly kind: NativeAstLossKind;
   readonly message: string;
   readonly span?: SourceSpan;
   readonly nodeId?: string;
+  readonly semanticIndexId?: string;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly evidenceIds?: readonly string[];
   readonly metadata?: JsonObject;
 }
+
+export declare const NativeAstLossKinds: readonly NativeAstLossKind[];
 
 export interface NativeAstRecord {
   readonly kind: "frontier.lang.nativeAst";
@@ -235,6 +258,52 @@ export interface SemanticIndexRecord {
   readonly metadata?: JsonObject;
 }
 
+export type SourceMapPrecision = "exact" | "declaration" | "line" | "estimated" | "unknown" | string;
+export declare const SourceMapPrecisions: readonly SourceMapPrecision[];
+
+export interface SourceMapGeneratedSpan extends SourceSpan {
+  readonly target?: CompileTarget;
+  readonly targetPath?: string;
+  readonly targetHash?: string;
+  readonly generatedName?: string;
+}
+
+export interface SourceMapMappingRecord {
+  readonly id: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstNodeId?: string;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly mergeCandidateId?: string;
+  readonly sourceSpan?: SourceSpan;
+  readonly generatedSpan?: SourceMapGeneratedSpan;
+  readonly target?: CompileTarget;
+  readonly generatedName?: string;
+  readonly evidenceIds?: readonly string[];
+  readonly lossIds?: readonly string[];
+  readonly precision: SourceMapPrecision;
+  readonly metadata?: JsonObject;
+}
+
+export interface SourceMapRecord {
+  readonly kind: "frontier.lang.sourceMap";
+  readonly version: 1;
+  readonly id: string;
+  readonly sourcePath?: string;
+  readonly sourceHash?: string;
+  readonly target?: CompileTarget;
+  readonly targetPath?: string;
+  readonly targetHash?: string;
+  readonly semanticIndexId?: string;
+  readonly universalAstId?: string;
+  readonly nativeAstId?: string;
+  readonly nativeSourceId?: SemanticId;
+  readonly mappings: readonly SourceMapMappingRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
 export interface FrontierUniversalAstEnvelope {
   readonly kind: "frontier.lang.universalAst";
   readonly version: 1;
@@ -243,6 +312,7 @@ export interface FrontierUniversalAstEnvelope {
   readonly document: FrontierLangDocument;
   readonly nativeSources: readonly NativeSourceNode[];
   readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps: readonly SourceMapRecord[];
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
@@ -557,6 +627,7 @@ export interface LanguageImportResult {
   readonly semanticIndex?: SemanticIndexRecord;
   readonly universalAst?: FrontierUniversalAstEnvelope;
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly sourceMaps?: readonly SourceMapRecord[];
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
@@ -618,9 +689,22 @@ export declare function nativeSourceNode(input: Omit<NativeSourceNode, "kind">):
 export declare function createNativeAstRecord(input: Omit<NativeAstRecord, "kind" | "version">): NativeAstRecord;
 export declare function createSemanticIndexRecord(input: Omit<SemanticIndexRecord, "kind" | "version">): SemanticIndexRecord;
 export declare function validateSemanticIndexRecord(index: SemanticIndexRecord): readonly string[];
-export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "losses" | "evidence"> & {
+export declare function createSourceMapRecord(input: Omit<SourceMapRecord, "kind" | "version" | "mappings"> & {
+  readonly mappings?: readonly SourceMapMappingRecord[];
+}): SourceMapRecord;
+export declare function validateSourceMapRecord(sourceMap: SourceMapRecord, context?: {
+  readonly document?: FrontierLangDocument;
+  readonly nativeSources?: readonly NativeSourceNode[];
+  readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+}): readonly string[];
+export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence"> & {
   readonly schema?: FrontierUniversalAstEnvelope["schema"];
   readonly nativeSources?: readonly NativeSourceNode[];
+  readonly sourceMaps?: readonly SourceMapRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
 }): FrontierUniversalAstEnvelope;
@@ -631,6 +715,7 @@ export declare function createImportResult(input: Omit<LanguageImportResult, "ki
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly sourceMaps?: readonly SourceMapRecord[];
 }): LanguageImportResult;
 export declare function createSemanticMergeCandidateRecord(input: Omit<SemanticMergeCandidateRecord, "kind" | "version" | "touchedSymbols" | "touchedSemanticNodes" | "nativeSpans" | "conflictKeys" | "readiness" | "reasons"> & {
   readonly touchedSymbols?: readonly SemanticMergeTouchedSymbol[];
