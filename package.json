@@ -1,6 +1,6 @@
 {
   "name": "@shapeshift-labs/frontier-lang-kernel",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Runtime-neutral semantic source graph, patch, replay, hashing, and merge-admission kernel for Frontier Lang.",
   "type": "module",
   "main": "./dist/index.js",
@@ -52,7 +52,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.9.3"
   }

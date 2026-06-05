@@ -490,6 +490,61 @@ export interface EvidenceRecord {
   readonly metadata?: JsonObject;
 }
 
+export type SemanticMergeReadiness = "ready" | "ready-with-losses" | "needs-review" | "blocked";
+
+export interface SemanticMergeTouchedSymbol {
+  readonly id: string;
+  readonly name?: string;
+  readonly kind?: SemanticIndexSymbolKind;
+  readonly role?: SemanticIndexOccurrenceRole;
+  readonly semanticNodeId?: SemanticId;
+  readonly nativeAstNodeId?: string;
+  readonly span?: SourceSpan;
+  readonly conflictKey: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticMergeTouchedNode {
+  readonly id: SemanticId;
+  readonly kind?: NodeKind | string;
+  readonly name?: string;
+  readonly conflictKey: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticMergeNativeSpan {
+  readonly id: string;
+  readonly sourceId?: string;
+  readonly path?: string;
+  readonly language?: FrontierSourceLanguage;
+  readonly nativeAstNodeId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly symbolId?: string;
+  readonly span?: SourceSpan;
+  readonly conflictKey: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticMergeCandidateRecord {
+  readonly kind: "frontier.lang.semanticMergeCandidate";
+  readonly version: 1;
+  readonly id: string;
+  readonly importResultId?: string;
+  readonly patchId?: string;
+  readonly language?: FrontierSourceLanguage;
+  readonly sourcePath?: string;
+  readonly baseHash?: string;
+  readonly targetHash?: string;
+  readonly touchedSymbols: readonly SemanticMergeTouchedSymbol[];
+  readonly touchedSemanticNodes: readonly SemanticMergeTouchedNode[];
+  readonly nativeSpans: readonly SemanticMergeNativeSpan[];
+  readonly conflictKeys: readonly string[];
+  readonly readiness: SemanticMergeReadiness;
+  readonly reasons: readonly string[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
 export interface LanguageImportResult {
   readonly kind: "frontier.lang.importResult";
   readonly version: 1;
@@ -501,6 +556,7 @@ export interface LanguageImportResult {
   readonly nativeAst?: NativeAstRecord;
   readonly semanticIndex?: SemanticIndexRecord;
   readonly universalAst?: FrontierUniversalAstEnvelope;
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
@@ -571,7 +627,33 @@ export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversal
 export declare function validateUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): readonly string[];
 export declare function stableUniversalAstJson(envelope: FrontierUniversalAstEnvelope): string;
 export declare function hashUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): string;
-export declare function createImportResult(input: Omit<LanguageImportResult, "kind" | "version">): LanguageImportResult;
+export declare function createImportResult(input: Omit<LanguageImportResult, "kind" | "version" | "losses" | "evidence" | "mergeCandidates"> & {
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+}): LanguageImportResult;
+export declare function createSemanticMergeCandidateRecord(input: Omit<SemanticMergeCandidateRecord, "kind" | "version" | "touchedSymbols" | "touchedSemanticNodes" | "nativeSpans" | "conflictKeys" | "readiness" | "reasons"> & {
+  readonly touchedSymbols?: readonly SemanticMergeTouchedSymbol[];
+  readonly touchedSemanticNodes?: readonly SemanticMergeTouchedNode[];
+  readonly nativeSpans?: readonly SemanticMergeNativeSpan[];
+  readonly conflictKeys?: readonly string[];
+  readonly readiness?: SemanticMergeReadiness;
+  readonly reasons?: readonly string[];
+}): SemanticMergeCandidateRecord;
+export declare function createSemanticMergeCandidateFromImport(input: {
+  readonly importResult: LanguageImportResult;
+  readonly id?: string;
+  readonly patch?: SemanticPatchBundle;
+  readonly document?: FrontierLangDocument;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly nativeAst?: NativeAstRecord;
+  readonly sourcePath?: string;
+  readonly language?: FrontierSourceLanguage;
+  readonly readiness?: SemanticMergeReadiness;
+  readonly reasons?: readonly string[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}): SemanticMergeCandidateRecord;
 export declare function createPatch(input: Omit<SemanticPatchBundle, "kind" | "version">): SemanticPatchBundle;
 export declare function createDocument(input: {
   readonly id: SemanticId;

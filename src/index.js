@@ -191,11 +191,106 @@ export function hashUniversalAstEnvelope(envelope) {
 }
 
 export function createImportResult(input) {
-  return {
+  const result = {
     ...input,
     kind: "frontier.lang.importResult",
-    version: 1
+    version: 1,
+    losses: input.losses ?? [],
+    evidence: input.evidence ?? []
   };
+  return {
+    ...result,
+    mergeCandidates: input.mergeCandidates ?? (hasNativeImportMergeSurface(result)
+      ? [createSemanticMergeCandidateFromImport({ importResult: result })]
+      : [])
+  };
+}
+
+export function createSemanticMergeCandidateRecord(input) {
+  const touchedSymbols = input.touchedSymbols ?? [];
+  const touchedSemanticNodes = input.touchedSemanticNodes ?? [];
+  const nativeSpans = input.nativeSpans ?? [];
+  const conflictKeys = input.conflictKeys ?? collectSemanticMergeConflictKeys({
+    touchedSymbols,
+    touchedSemanticNodes,
+    nativeSpans
+  });
+  return {
+    ...input,
+    kind: "frontier.lang.semanticMergeCandidate",
+    version: 1,
+    touchedSymbols,
+    touchedSemanticNodes,
+    nativeSpans,
+    conflictKeys,
+    readiness: input.readiness ?? "needs-review",
+    reasons: input.reasons ?? []
+  };
+}
+
+export function createSemanticMergeCandidateFromImport(input) {
+  const importResult = input.importResult;
+  const patch = input.patch ?? importResult.patch;
+  const document = input.document ?? importResult.document;
+  const semanticIndex = input.semanticIndex ?? importResult.semanticIndex ?? importResult.universalAst?.semanticIndex;
+  const nativeAst = input.nativeAst ?? importResult.nativeAst;
+  const patchSummary = patch ? summarizePatch(patch) : emptyPatchSummary();
+  const semanticTouchIds = collectPatchSemanticTouchIds(document, patchSummary);
+  const touchedSymbols = collectTouchedSemanticMergeSymbols(semanticIndex, semanticTouchIds, !patch);
+  const touchedSemanticNodes = collectTouchedSemanticMergeNodes(document, semanticIndex, touchedSymbols, semanticTouchIds, !patch);
+  const nativeSpans = collectSemanticMergeNativeSpans({
+    semanticIndex,
+    nativeAst,
+    touchedSymbols,
+    semanticTouchIds,
+    sourcePath: input.sourcePath ?? importResult.sourcePath ?? nativeAst?.sourcePath,
+    language: input.language ?? importResult.language ?? nativeAst?.language,
+    includeAll: !patch
+  });
+  const evidence = uniqueEvidence([
+    ...(importResult.evidence ?? []),
+    ...(patch ? collectPatchEvidence(patch) : []),
+    ...(input.evidence ?? [])
+  ]);
+  const losses = uniqueById([
+    ...(importResult.losses ?? []),
+    ...(nativeAst?.losses ?? []),
+    ...(importResult.universalAst?.losses ?? [])
+  ]);
+  const readiness = input.readiness
+    ? { readiness: input.readiness, reasons: input.reasons ?? [] }
+    : inferSemanticMergeReadiness({
+      patch,
+      patchSummary,
+      evidence,
+      losses,
+      touchedSymbols,
+      touchedSemanticNodes
+    });
+
+  return createSemanticMergeCandidateRecord({
+    id: input.id ?? `merge-candidate:${importResult.id ?? patch?.id ?? semanticIndex?.id ?? nativeAst?.id ?? "unknown"}`,
+    importResultId: importResult.id,
+    patchId: patch?.id,
+    language: input.language ?? importResult.language ?? nativeAst?.language,
+    sourcePath: input.sourcePath ?? importResult.sourcePath ?? nativeAst?.sourcePath,
+    baseHash: patch?.baseHash,
+    targetHash: patch?.targetHash,
+    touchedSymbols,
+    touchedSemanticNodes,
+    nativeSpans,
+    conflictKeys: collectSemanticMergeConflictKeys({
+      touchedSymbols,
+      touchedSemanticNodes,
+      nativeSpans,
+      regions: patchSummary.regions,
+      effects: patchSummary.effects
+    }),
+    readiness: readiness.readiness,
+    reasons: readiness.reasons,
+    evidence,
+    metadata: input.metadata
+  });
 }
 
 export function createPatch(input) {
@@ -710,6 +805,292 @@ function collectPatchEvidence(patch) {
     }
   }
   return evidence;
+}
+
+function hasNativeImportMergeSurface(result) {
+  return Boolean(result.patch || result.nativeAst || result.semanticIndex || result.universalAst?.semanticIndex);
+}
+
+function emptyPatchSummary() {
+  return { nodeIds: [], regions: [], effects: [] };
+}
+
+function collectPatchSemanticTouchIds(document, patchSummary) {
+  const ownerByRegion = collectSemanticRegionOwners(document);
+  const ids = [...patchSummary.nodeIds];
+  for (const region of patchSummary.regions) {
+    const ownerId = ownerByRegion.get(region);
+    if (ownerId) {
+      ids.push(ownerId);
+    }
+  }
+  return new Set(unique(ids));
+}
+
+function collectSemanticRegionOwners(document) {
+  const owners = new Map();
+  for (const node of Object.values(document?.nodes ?? {})) {
+    if (node.kind === "entity") {
+      for (const field of node.fields ?? []) {
+        owners.set(field.id, node.id);
+        owners.set(`${node.name}.${field.name}`, node.id);
+      }
+    }
+    if (node.kind === "state") {
+      for (const collection of node.collections ?? []) {
+        owners.set(collection.id, node.id);
+        owners.set(`${node.name}.${collection.name}`, node.id);
+      }
+    }
+  }
+  return owners;
+}
+
+function collectTouchedSemanticMergeSymbols(semanticIndex, semanticTouchIds, includeAll) {
+  const symbols = [];
+  const occurrencesBySymbol = groupOccurrencesBySymbol(semanticIndex?.occurrences ?? []);
+
+  for (const symbol of semanticIndex?.symbols ?? []) {
+    const occurrences = occurrencesBySymbol.get(symbol.id) ?? [];
+    const isTouched = includeAll ||
+      semanticTouchIds.has(symbol.id) ||
+      semanticTouchIds.has(symbol.name) ||
+      (symbol.semanticNodeId && semanticTouchIds.has(symbol.semanticNodeId)) ||
+      (symbol.nativeAstNodeId && semanticTouchIds.has(symbol.nativeAstNodeId)) ||
+      occurrences.some((occurrence) =>
+        semanticTouchIds.has(occurrence.id) ||
+        (occurrence.semanticNodeId && semanticTouchIds.has(occurrence.semanticNodeId)) ||
+        (occurrence.nativeAstNodeId && semanticTouchIds.has(occurrence.nativeAstNodeId))
+      );
+    if (!isTouched) {
+      continue;
+    }
+
+    const occurrence = occurrences.find((record) => record.role === "definition" || record.role === "declaration") ?? occurrences[0];
+    symbols.push({
+      id: symbol.id,
+      name: symbol.name,
+      kind: symbol.kind,
+      role: occurrence?.role,
+      semanticNodeId: symbol.semanticNodeId ?? occurrence?.semanticNodeId,
+      nativeAstNodeId: symbol.nativeAstNodeId ?? occurrence?.nativeAstNodeId,
+      span: symbol.definitionSpan ?? occurrence?.span,
+      conflictKey: `symbol:${symbol.id}`,
+      metadata: symbol.metadata
+    });
+  }
+
+  return uniqueById(symbols);
+}
+
+function collectTouchedSemanticMergeNodes(document, semanticIndex, touchedSymbols, semanticTouchIds, includeAll) {
+  const ids = [];
+  for (const id of semanticTouchIds) {
+    if (document?.nodes?.[id]) {
+      ids.push(id);
+    }
+  }
+  for (const symbol of touchedSymbols) {
+    if (symbol.semanticNodeId) {
+      ids.push(symbol.semanticNodeId);
+    }
+  }
+  for (const occurrence of semanticIndex?.occurrences ?? []) {
+    if (occurrence.semanticNodeId && (includeAll || semanticTouchIds.has(occurrence.semanticNodeId))) {
+      ids.push(occurrence.semanticNodeId);
+    }
+  }
+  if (includeAll) {
+    for (const node of Object.values(document?.nodes ?? {})) {
+      if (node.kind === "nativeSource") {
+        ids.push(...(node.frontierNodeIds ?? []));
+      }
+    }
+  }
+
+  return unique(ids)
+    .filter((id) => document?.nodes?.[id])
+    .map((id) => {
+      const node = document.nodes[id];
+      return {
+        id,
+        kind: node.kind,
+        name: node.name,
+        conflictKey: `node:${id}`,
+        metadata: node.metadata
+      };
+    });
+}
+
+function collectSemanticMergeNativeSpans(input) {
+  const spans = [];
+  const touchedSymbolIds = new Set(input.touchedSymbols.map((symbol) => symbol.id));
+  const touchedNativeNodeIds = new Set(input.touchedSymbols.map((symbol) => symbol.nativeAstNodeId).filter(Boolean));
+  const documentsById = new Map((input.semanticIndex?.documents ?? []).map((document) => [document.id, document]));
+
+  for (const occurrence of input.semanticIndex?.occurrences ?? []) {
+    const document = documentsById.get(occurrence.documentId);
+    const isTouched = input.includeAll ||
+      touchedSymbolIds.has(occurrence.symbolId) ||
+      (occurrence.semanticNodeId && input.semanticTouchIds.has(occurrence.semanticNodeId)) ||
+      (occurrence.nativeAstNodeId && touchedNativeNodeIds.has(occurrence.nativeAstNodeId));
+    if (!occurrence.span || !isTouched) {
+      continue;
+    }
+    if (occurrence.nativeAstNodeId) {
+      touchedNativeNodeIds.add(occurrence.nativeAstNodeId);
+    }
+    const span = spanWithFallbackPath(occurrence.span, document?.path ?? input.sourcePath);
+    spans.push({
+      id: `span:${occurrence.id}`,
+      sourceId: span.sourceId,
+      path: span.path,
+      language: document?.language ?? input.language,
+      nativeAstNodeId: occurrence.nativeAstNodeId,
+      semanticNodeId: occurrence.semanticNodeId,
+      symbolId: occurrence.symbolId,
+      span,
+      conflictKey: nativeSpanConflictKey(span, occurrence.nativeAstNodeId)
+    });
+  }
+
+  for (const [nodeId, node] of Object.entries(input.nativeAst?.nodes ?? {})) {
+    if (!node.span) {
+      continue;
+    }
+    if (!input.includeAll && !touchedNativeNodeIds.has(nodeId) && !input.semanticTouchIds.has(nodeId)) {
+      continue;
+    }
+    const span = spanWithFallbackPath(node.span, input.sourcePath ?? input.nativeAst?.sourcePath);
+    spans.push({
+      id: `span:${nodeId}`,
+      sourceId: span.sourceId,
+      path: span.path,
+      language: input.language ?? input.nativeAst?.language,
+      nativeAstNodeId: nodeId,
+      span,
+      conflictKey: nativeSpanConflictKey(span, nodeId),
+      metadata: node.metadata
+    });
+  }
+
+  return uniqueById(spans);
+}
+
+function spanWithFallbackPath(span, path) {
+  return {
+    ...span,
+    path: span.path ?? path
+  };
+}
+
+function nativeSpanConflictKey(span, nativeAstNodeId) {
+  const location = [
+    span.path ?? span.sourceId ?? "unknown",
+    span.startLine ?? span.start ?? "",
+    span.startColumn ?? "",
+    span.endLine ?? span.end ?? "",
+    span.endColumn ?? "",
+    nativeAstNodeId ?? ""
+  ].join(":");
+  return `native:${location}`;
+}
+
+function collectSemanticMergeConflictKeys(input) {
+  return unique([
+    ...(input.touchedSymbols ?? []).map((symbol) => symbol.conflictKey ?? `symbol:${symbol.id}`),
+    ...(input.touchedSemanticNodes ?? []).map((node) => node.conflictKey ?? `node:${node.id}`),
+    ...(input.nativeSpans ?? []).map((span) => span.conflictKey),
+    ...(input.regions ?? []).map((region) => `region:${region}`),
+    ...(input.effects ?? []).map((effect) => `effect:${effect}`)
+  ].filter(Boolean)).sort(ordinalCompare);
+}
+
+function inferSemanticMergeReadiness(input) {
+  const failedEvidence = input.evidence.filter((record) => record.status === "failed");
+  if (failedEvidence.length > 0) {
+    return {
+      readiness: "blocked",
+      reasons: [`Failed evidence prevents merge: ${failedEvidence.map((record) => record.id).join(", ")}`]
+    };
+  }
+
+  const errorLosses = input.losses.filter((record) => record.severity === "error");
+  if (errorLosses.length > 0) {
+    return {
+      readiness: "blocked",
+      reasons: [`Native import loss error(s) require repair: ${errorLosses.map((record) => record.id).join(", ")}`]
+    };
+  }
+
+  if (!input.patch) {
+    return {
+      readiness: "needs-review",
+      reasons: ["No semantic patch was attached to the native import result."]
+    };
+  }
+
+  if (input.patch.risk === "high" || input.patch.risk === "unknown") {
+    return {
+      readiness: "needs-review",
+      reasons: [`Patch risk is ${input.patch.risk}.`]
+    };
+  }
+
+  const dynamicEffects = new Set(["dynamic", "eval", "unsafeEval", "ffi", "reflection", "proxy"]);
+  const dynamicTouched = input.patchSummary.effects.filter((effect) => dynamicEffects.has(effect));
+  if (dynamicTouched.length > 0) {
+    return {
+      readiness: "needs-review",
+      reasons: [`Patch touches dynamic effect boundary: ${unique(dynamicTouched).join(", ")}`]
+    };
+  }
+
+  if (input.touchedSymbols.length === 0 && input.touchedSemanticNodes.length === 0) {
+    return {
+      readiness: "needs-review",
+      reasons: ["Merge candidate has no touched symbols or semantic nodes."]
+    };
+  }
+
+  if (input.losses.length > 0) {
+    return {
+      readiness: "ready-with-losses",
+      reasons: [`Native import recorded non-blocking loss(es): ${input.losses.map((record) => record.id).join(", ")}`]
+    };
+  }
+
+  return {
+    readiness: "ready",
+    reasons: ["Native import candidate has patch, semantic touches, and no blocking evidence."]
+  };
+}
+
+function groupOccurrencesBySymbol(occurrences) {
+  const groups = new Map();
+  for (const occurrence of occurrences) {
+    const group = groups.get(occurrence.symbolId) ?? [];
+    group.push(occurrence);
+    groups.set(occurrence.symbolId, group);
+  }
+  return groups;
+}
+
+function uniqueEvidence(records) {
+  return uniqueById(records);
+}
+
+function uniqueById(records) {
+  const seen = new Set();
+  const result = [];
+  for (const record of records) {
+    if (!record?.id || seen.has(record.id)) {
+      continue;
+    }
+    seen.add(record.id);
+    result.push(record);
+  }
+  return result;
 }
 
 function withReplayGate(base, left, right, admission) {

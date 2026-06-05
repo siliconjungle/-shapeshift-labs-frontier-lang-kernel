@@ -8,6 +8,7 @@ import {
   createNativeAstRecord,
   createPatch,
   createSemanticIndexRecord,
+  createSemanticMergeCandidateFromImport,
   createUniversalAstEnvelope,
   entityNode,
   effectNode,
@@ -126,7 +127,7 @@ const semanticIndex = createSemanticIndexRecord({
   repository: { rootUri: 'file:///repo', commit: 'abc123' },
   documents: [{ id: 'doc_todo_ts', path: 'src/todo.ts', language: 'typescript', sourceHash: 'sha256:example', nativeSourceId: 'native_source_todo' }],
   symbols: [{ id: 'symbol:Todo', scheme: 'frontier', name: 'Todo', kind: 'interface', language: 'typescript', semanticNodeId: 'ent_todo', nativeAstNodeId: 'native_todo_interface' }],
-  occurrences: [{ id: 'occ_todo_def', documentId: 'doc_todo_ts', symbolId: 'symbol:Todo', role: 'definition', semanticNodeId: 'ent_todo', nativeAstNodeId: 'native_todo_interface' }],
+  occurrences: [{ id: 'occ_todo_def', documentId: 'doc_todo_ts', symbolId: 'symbol:Todo', role: 'definition', span: { path: 'src/todo.ts', startLine: 1, startColumn: 1, endLine: 4, endColumn: 2 }, semanticNodeId: 'ent_todo', nativeAstNodeId: 'native_todo_interface' }],
   relations: [{ id: 'rel_doc_defines_todo', sourceId: 'doc_todo_ts', predicate: 'defines', targetId: 'symbol:Todo' }],
   facts: [{ id: 'fact_todo_hash', predicate: 'signatureHash', subjectId: 'symbol:Todo', value: 'fnv1a32:example' }],
   evidence: [{ id: 'index_build', kind: 'import', status: 'passed', summary: 'Built symbol index.' }]
@@ -143,11 +144,24 @@ assert.equal(universalAst.nativeSources[0].id, 'native_source_todo');
 assert.equal(universalAst.losses[0].kind, 'unsupportedSyntax');
 assert.match(stableUniversalAstJson(universalAst), /frontier\.lang\.universalAst/);
 assert.match(hashUniversalAstEnvelope(universalAst), /^fnv1a32:/);
+const baseHash = hashDocumentBase(document);
+const nativeImportPatch = createPatch({
+  id: 'native-import-todo',
+  baseHash,
+  operations: [{
+    op: 'updateNode',
+    id: 'ent_todo',
+    set: { metadata: { importedFrom: 'src/todo.ts' } },
+    touches: [{ id: 'field_title', access: 'write' }]
+  }],
+  evidence: [{ id: 'native_import_typecheck', kind: 'typecheck', status: 'passed' }]
+});
 const importResult = createImportResult({
   id: 'import_todo_ts',
   language: 'typescript',
   sourcePath: 'src/todo.ts',
   document,
+  patch: nativeImportPatch,
   nativeAst,
   semanticIndex,
   universalAst,
@@ -158,6 +172,19 @@ assert.equal(importResult.nativeAst.nodes.native_todo_interface.kind, 'Interface
 assert.equal(importResult.semanticIndex.symbols[0].id, 'symbol:Todo');
 assert.equal(importResult.universalAst.semanticIndex.id, 'index_todo');
 assert.match(importResult.losses[0].message, /Decorator/);
+assert.equal(importResult.mergeCandidates.length, 1);
+const mergeCandidate = importResult.mergeCandidates[0];
+assert.equal(mergeCandidate.kind, 'frontier.lang.semanticMergeCandidate');
+assert.equal(mergeCandidate.patchId, 'native-import-todo');
+assert.equal(mergeCandidate.readiness, 'ready-with-losses');
+assert.deepEqual(mergeCandidate.touchedSymbols.map((symbol) => symbol.id), ['symbol:Todo']);
+assert.deepEqual(mergeCandidate.touchedSemanticNodes.map((node) => node.id), ['ent_todo']);
+assert.equal(mergeCandidate.nativeSpans.some((span) => span.nativeAstNodeId === 'native_todo_interface' && span.path === 'src/todo.ts'), true);
+assert.equal(mergeCandidate.conflictKeys.includes('node:ent_todo'), true);
+assert.equal(mergeCandidate.conflictKeys.includes('region:field_title'), true);
+assert.equal(mergeCandidate.conflictKeys.includes('symbol:symbol:Todo'), true);
+assert.equal(mergeCandidate.conflictKeys.some((key) => key.startsWith('native:src/todo.ts:1:1:4:2:native_todo_interface')), true);
+assert.equal(createSemanticMergeCandidateFromImport({ importResult, id: 'merge-candidate:explicit' }).touchedSymbols[0].id, 'symbol:Todo');
 assert.match(
   validateDocument(createDocument({ id: 'bad', name: 'Bad', nodes: [
     entityNode({ id: 'bad_entity', name: 'Bad', fields: [
@@ -166,7 +193,6 @@ assert.match(
   ] })).join('\n'),
   /missing lattice/
 );
-const baseHash = hashDocumentBase(document);
 const rename = createPatch({ id: 'rename', baseHash, operations: [{ op: 'renameNode', id: 'ent_todo', name: 'Task' }] });
 assert.equal(applySemanticPatch(document, rename).nodes.ent_todo.name, 'Task');
 assert.equal(replayDocument(document, [{ id: 'event_rename', actor: 'test', patch: rename }]).history.at(-1).id, 'event_rename');
