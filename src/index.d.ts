@@ -104,6 +104,9 @@ export type NativeAstLossKind =
   | "targetLowering"
   | string;
 
+export type SourcePreservationLevel = "exact" | "declaration" | "estimated" | "blocked" | string;
+export declare const SourcePreservationLevels: readonly SourcePreservationLevel[];
+
 export interface NativeAstLossRecord {
   readonly id: string;
   readonly severity: "info" | "warning" | "error";
@@ -119,6 +122,7 @@ export interface NativeAstLossRecord {
   readonly semanticOccurrenceId?: string;
   readonly sourceMapId?: string;
   readonly sourceMapMappingId?: string;
+  readonly preservation?: SourcePreservationLevel;
   readonly evidenceIds?: readonly string[];
   readonly metadata?: JsonObject;
 }
@@ -283,6 +287,7 @@ export interface SourceMapMappingRecord {
   readonly evidenceIds?: readonly string[];
   readonly lossIds?: readonly string[];
   readonly precision: SourceMapPrecision;
+  readonly preservation?: SourcePreservationLevel;
   readonly metadata?: JsonObject;
 }
 
@@ -301,6 +306,29 @@ export interface SourceMapRecord {
   readonly nativeSourceId?: SemanticId;
   readonly mappings: readonly SourceMapMappingRecord[];
   readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
+export interface SourcePreservationRecord {
+  readonly kind: "frontier.lang.sourcePreservation";
+  readonly version: 1;
+  readonly id: string;
+  readonly level: SourcePreservationLevel;
+  readonly precision?: SourceMapPrecision;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstNodeId?: string;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly sourceSpan?: SourceSpan;
+  readonly generatedSpan?: SourceMapGeneratedSpan;
+  readonly lossIds: readonly string[];
+  readonly evidenceIds: readonly string[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly reasons: readonly string[];
   readonly metadata?: JsonObject;
 }
 
@@ -708,11 +736,40 @@ export declare function validateSemanticIndexRecord(index: SemanticIndexRecord):
 export declare function createSourceMapRecord(input: Omit<SourceMapRecord, "kind" | "version" | "mappings"> & {
   readonly mappings?: readonly SourceMapMappingRecord[];
 }): SourceMapRecord;
+export declare function createSourcePreservationRecord(input: Omit<SourcePreservationRecord, "kind" | "version" | "lossIds" | "evidenceIds" | "reasons"> & {
+  readonly lossIds?: readonly string[];
+  readonly evidenceIds?: readonly string[];
+  readonly reasons?: readonly string[];
+}): SourcePreservationRecord;
+export declare function explainSourcePreservation(input: {
+  readonly id?: string;
+  readonly level?: SourcePreservationLevel;
+  readonly precision?: SourceMapPrecision;
+  readonly sourceMap?: SourceMapRecord;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly mapping?: SourceMapMappingRecord;
+  readonly mappingId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstNodeId?: string;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly sourceSpan?: SourceSpan;
+  readonly generatedSpan?: SourceMapGeneratedSpan;
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly lossIds?: readonly string[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly evidenceIds?: readonly string[];
+  readonly reasons?: readonly string[];
+  readonly metadata?: JsonObject;
+}): SourcePreservationRecord;
 export declare function validateSourceMapRecord(sourceMap: SourceMapRecord, context?: {
   readonly document?: FrontierLangDocument;
   readonly nativeSources?: readonly NativeSourceNode[];
   readonly nativeAst?: NativeAstRecord;
   readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps?: readonly SourceMapRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
