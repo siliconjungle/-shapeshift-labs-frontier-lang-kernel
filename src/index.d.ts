@@ -82,6 +82,9 @@ export interface NativeAstNode {
 export interface NativeAstLossRecord {
   readonly id: string;
   readonly severity: "info" | "warning" | "error";
+  readonly phase?: "read" | "filter" | "write" | "project" | "merge" | string;
+  readonly sourceFormat?: string;
+  readonly targetFormat?: string;
   readonly kind:
     | "unsupportedSyntax"
     | "unsupportedSemantic"
@@ -111,6 +114,137 @@ export interface NativeAstRecord {
   readonly rootId: string;
   readonly nodes: Readonly<Record<string, NativeAstNode>>;
   readonly losses?: readonly NativeAstLossRecord[];
+  readonly metadata?: JsonObject;
+}
+
+export type SemanticIndexSymbolKind =
+  | "module"
+  | "package"
+  | "namespace"
+  | "type"
+  | "class"
+  | "interface"
+  | "trait"
+  | "protocol"
+  | "function"
+  | "method"
+  | "field"
+  | "property"
+  | "variable"
+  | "constant"
+  | "parameter"
+  | string;
+
+export type SemanticIndexOccurrenceRole =
+  | "definition"
+  | "declaration"
+  | "reference"
+  | "import"
+  | "export"
+  | "read"
+  | "write"
+  | "call"
+  | "override"
+  | "implementation"
+  | string;
+
+export type SemanticIndexRelationPredicate =
+  | "contains"
+  | "defines"
+  | "references"
+  | "calls"
+  | "imports"
+  | "exports"
+  | "implements"
+  | "overrides"
+  | "dependsOn"
+  | "generatedFrom"
+  | "frontierMapsTo"
+  | string;
+
+export interface SemanticIndexRepository {
+  readonly rootUri?: string;
+  readonly commit?: string;
+  readonly workspace?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexDocument {
+  readonly id: string;
+  readonly path: string;
+  readonly language: FrontierSourceLanguage;
+  readonly sourceHash?: string;
+  readonly nativeSourceId?: SemanticId;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexSymbol {
+  readonly id: string;
+  readonly scheme?: "frontier" | "scip" | "lsif" | "glean" | "native" | string;
+  readonly name: string;
+  readonly kind: SemanticIndexSymbolKind;
+  readonly language?: FrontierSourceLanguage;
+  readonly semanticNodeId?: SemanticId;
+  readonly nativeAstNodeId?: string;
+  readonly signatureHash?: string;
+  readonly definitionSpan?: SourceSpan;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexOccurrence {
+  readonly id: string;
+  readonly documentId: string;
+  readonly symbolId: string;
+  readonly role: SemanticIndexOccurrenceRole;
+  readonly span?: SourceSpan;
+  readonly nativeAstNodeId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexRelation {
+  readonly id: string;
+  readonly sourceId: string;
+  readonly predicate: SemanticIndexRelationPredicate;
+  readonly targetId: string;
+  readonly evidenceIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexFact {
+  readonly id: string;
+  readonly predicate: string;
+  readonly subjectId: string;
+  readonly objectId?: string;
+  readonly value?: JsonValue;
+  readonly evidenceIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticIndexRecord {
+  readonly kind: "frontier.lang.semanticIndex";
+  readonly version: 1;
+  readonly id: string;
+  readonly repository?: SemanticIndexRepository;
+  readonly documents: readonly SemanticIndexDocument[];
+  readonly symbols: readonly SemanticIndexSymbol[];
+  readonly occurrences: readonly SemanticIndexOccurrence[];
+  readonly relations: readonly SemanticIndexRelation[];
+  readonly facts: readonly SemanticIndexFact[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
+export interface FrontierUniversalAstEnvelope {
+  readonly kind: "frontier.lang.universalAst";
+  readonly version: 1;
+  readonly id: string;
+  readonly schema: "frontier.lang.semantic.v1" | string;
+  readonly document: FrontierLangDocument;
+  readonly nativeSources: readonly NativeSourceNode[];
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly losses: readonly NativeAstLossRecord[];
+  readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
 }
 
@@ -365,6 +499,8 @@ export interface LanguageImportResult {
   readonly document: FrontierLangDocument;
   readonly patch?: SemanticPatchBundle;
   readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly universalAst?: FrontierUniversalAstEnvelope;
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
@@ -424,6 +560,17 @@ export declare function externNode(input: Omit<ExternNode, "kind">): ExternNode;
 export declare function latticeNode(input: Omit<LatticeNode, "kind">): LatticeNode;
 export declare function nativeSourceNode(input: Omit<NativeSourceNode, "kind">): NativeSourceNode;
 export declare function createNativeAstRecord(input: Omit<NativeAstRecord, "kind" | "version">): NativeAstRecord;
+export declare function createSemanticIndexRecord(input: Omit<SemanticIndexRecord, "kind" | "version">): SemanticIndexRecord;
+export declare function validateSemanticIndexRecord(index: SemanticIndexRecord): readonly string[];
+export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "losses" | "evidence"> & {
+  readonly schema?: FrontierUniversalAstEnvelope["schema"];
+  readonly nativeSources?: readonly NativeSourceNode[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+}): FrontierUniversalAstEnvelope;
+export declare function validateUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): readonly string[];
+export declare function stableUniversalAstJson(envelope: FrontierUniversalAstEnvelope): string;
+export declare function hashUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): string;
 export declare function createImportResult(input: Omit<LanguageImportResult, "kind" | "version">): LanguageImportResult;
 export declare function createPatch(input: Omit<SemanticPatchBundle, "kind" | "version">): SemanticPatchBundle;
 export declare function createDocument(input: {

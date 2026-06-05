@@ -58,6 +58,138 @@ export function createNativeAstRecord(input) {
   };
 }
 
+export function createSemanticIndexRecord(input) {
+  return {
+    ...input,
+    kind: "frontier.lang.semanticIndex",
+    version: 1,
+    documents: input.documents ?? [],
+    symbols: input.symbols ?? [],
+    occurrences: input.occurrences ?? [],
+    relations: input.relations ?? [],
+    facts: input.facts ?? []
+  };
+}
+
+export function validateSemanticIndexRecord(index) {
+  const issues = [];
+  if (index.kind !== "frontier.lang.semanticIndex") {
+    issues.push(`Semantic index ${index.id ?? "(unknown)"} has invalid kind`);
+  }
+  if (index.version !== 1) {
+    issues.push(`Semantic index ${index.id ?? "(unknown)"} has unsupported version ${index.version}`);
+  }
+
+  const documentIds = collectUniqueIds(index.documents ?? [], "document", issues);
+  const symbolIds = collectUniqueIds(index.symbols ?? [], "symbol", issues);
+  const occurrenceIds = collectUniqueIds(index.occurrences ?? [], "occurrence", issues);
+  collectUniqueIds(index.relations ?? [], "relation", issues);
+  collectUniqueIds(index.facts ?? [], "fact", issues);
+
+  for (const document of index.documents ?? []) {
+    if (!document.path) issues.push(`Semantic index document ${document.id} is missing path`);
+    if (!document.language) issues.push(`Semantic index document ${document.id} is missing language`);
+  }
+
+  for (const symbol of index.symbols ?? []) {
+    if (!symbol.name) issues.push(`Semantic index symbol ${symbol.id} is missing name`);
+    if (!symbol.kind) issues.push(`Semantic index symbol ${symbol.id} is missing kind`);
+  }
+
+  for (const occurrence of index.occurrences ?? []) {
+    if (!documentIds.has(occurrence.documentId)) {
+      issues.push(`Semantic index occurrence ${occurrence.id} references missing document ${occurrence.documentId}`);
+    }
+    if (!symbolIds.has(occurrence.symbolId)) {
+      issues.push(`Semantic index occurrence ${occurrence.id} references missing symbol ${occurrence.symbolId}`);
+    }
+    if (!occurrence.role) issues.push(`Semantic index occurrence ${occurrence.id} is missing role`);
+  }
+
+  const graphIds = new Set([
+    ...documentIds,
+    ...symbolIds,
+    ...occurrenceIds,
+    ...(index.facts ?? []).map((fact) => fact.id)
+  ]);
+
+  for (const relation of index.relations ?? []) {
+    if (!graphIds.has(relation.sourceId)) {
+      issues.push(`Semantic index relation ${relation.id} references missing source ${relation.sourceId}`);
+    }
+    if (!graphIds.has(relation.targetId)) {
+      issues.push(`Semantic index relation ${relation.id} references missing target ${relation.targetId}`);
+    }
+    if (!relation.predicate) issues.push(`Semantic index relation ${relation.id} is missing predicate`);
+  }
+
+  for (const fact of index.facts ?? []) {
+    if (!fact.predicate) issues.push(`Semantic index fact ${fact.id} is missing predicate`);
+    if (!graphIds.has(fact.subjectId)) {
+      issues.push(`Semantic index fact ${fact.id} references missing subject ${fact.subjectId}`);
+    }
+    if (fact.objectId && !graphIds.has(fact.objectId)) {
+      issues.push(`Semantic index fact ${fact.id} references missing object ${fact.objectId}`);
+    }
+  }
+
+  return issues;
+}
+
+export function createUniversalAstEnvelope(input) {
+  const nativeSources = input.nativeSources ?? Object.values(input.document.nodes).filter((node) => node.kind === "nativeSource");
+  const losses = input.losses ?? nativeSources.flatMap((source) => source.losses ?? source.ast?.losses ?? []);
+  return {
+    ...input,
+    kind: "frontier.lang.universalAst",
+    version: 1,
+    schema: input.schema ?? "frontier.lang.semantic.v1",
+    nativeSources,
+    losses,
+    evidence: input.evidence ?? []
+  };
+}
+
+export function validateUniversalAstEnvelope(envelope) {
+  const issues = [];
+  if (envelope.kind !== "frontier.lang.universalAst") {
+    issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} has invalid kind`);
+  }
+  if (envelope.version !== 1) {
+    issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} has unsupported version ${envelope.version}`);
+  }
+  if (!envelope.schema) {
+    issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} is missing schema`);
+  }
+  if (!envelope.document || envelope.document.kind !== "frontier.lang.document") {
+    issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} is missing a Frontier Lang document`);
+  } else {
+    issues.push(...validateDocument(envelope.document).map((issue) => `document: ${issue}`));
+  }
+  const nativeSourceIds = new Set();
+  for (const source of envelope.nativeSources ?? []) {
+    if (source.kind !== "nativeSource") {
+      issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} contains invalid native source ${source.id ?? "(unknown)"}`);
+    }
+    if (nativeSourceIds.has(source.id)) {
+      issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} has duplicate native source ${source.id}`);
+    }
+    nativeSourceIds.add(source.id);
+  }
+  if (envelope.semanticIndex) {
+    issues.push(...validateSemanticIndexRecord(envelope.semanticIndex).map((issue) => `semanticIndex: ${issue}`));
+  }
+  return issues;
+}
+
+export function stableUniversalAstJson(envelope) {
+  return stableStringify(envelope);
+}
+
+export function hashUniversalAstEnvelope(envelope) {
+  return hashSemanticValue(envelope);
+}
+
 export function createImportResult(input) {
   return {
     ...input,
@@ -711,6 +843,21 @@ function duplicateValues(values) {
     seen.add(value);
   }
   return duplicates;
+}
+
+function collectUniqueIds(records, label, issues) {
+  const ids = new Set();
+  for (const record of records) {
+    if (!record?.id) {
+      issues.push(`Semantic index ${label} is missing id`);
+      continue;
+    }
+    if (ids.has(record.id)) {
+      issues.push(`Semantic index has duplicate ${label} id ${record.id}`);
+    }
+    ids.add(record.id);
+  }
+  return ids;
 }
 
 function intersection(left, right) {

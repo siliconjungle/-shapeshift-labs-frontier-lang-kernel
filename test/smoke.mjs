@@ -7,15 +7,21 @@ import {
   createImportResult,
   createNativeAstRecord,
   createPatch,
+  createSemanticIndexRecord,
+  createUniversalAstEnvelope,
   entityNode,
   effectNode,
   externNode,
   hashDocumentBase,
+  hashUniversalAstEnvelope,
   latticeNode,
   nativeSourceNode,
   replayDocument,
+  stableUniversalAstJson,
   typeNode,
-  validateDocument
+  validateDocument,
+  validateSemanticIndexRecord,
+  validateUniversalAstEnvelope
 } from '../dist/index.js';
 
 const tagSet = latticeNode({
@@ -115,16 +121,42 @@ const nativeTodo = nativeSourceNode({
 const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, httpRequest, fetchTodo, todo, nativeTodo] });
 assert.deepEqual(validateDocument(document), []);
 assert.equal(document.nodes.cap_http_request.adapters[1].target.language, 'rust');
+const semanticIndex = createSemanticIndexRecord({
+  id: 'index_todo',
+  repository: { rootUri: 'file:///repo', commit: 'abc123' },
+  documents: [{ id: 'doc_todo_ts', path: 'src/todo.ts', language: 'typescript', sourceHash: 'sha256:example', nativeSourceId: 'native_source_todo' }],
+  symbols: [{ id: 'symbol:Todo', scheme: 'frontier', name: 'Todo', kind: 'interface', language: 'typescript', semanticNodeId: 'ent_todo', nativeAstNodeId: 'native_todo_interface' }],
+  occurrences: [{ id: 'occ_todo_def', documentId: 'doc_todo_ts', symbolId: 'symbol:Todo', role: 'definition', semanticNodeId: 'ent_todo', nativeAstNodeId: 'native_todo_interface' }],
+  relations: [{ id: 'rel_doc_defines_todo', sourceId: 'doc_todo_ts', predicate: 'defines', targetId: 'symbol:Todo' }],
+  facts: [{ id: 'fact_todo_hash', predicate: 'signatureHash', subjectId: 'symbol:Todo', value: 'fnv1a32:example' }],
+  evidence: [{ id: 'index_build', kind: 'import', status: 'passed', summary: 'Built symbol index.' }]
+});
+assert.deepEqual(validateSemanticIndexRecord(semanticIndex), []);
+const universalAst = createUniversalAstEnvelope({
+  id: 'uast_todo',
+  document,
+  semanticIndex,
+  evidence: semanticIndex.evidence
+});
+assert.deepEqual(validateUniversalAstEnvelope(universalAst), []);
+assert.equal(universalAst.nativeSources[0].id, 'native_source_todo');
+assert.equal(universalAst.losses[0].kind, 'unsupportedSyntax');
+assert.match(stableUniversalAstJson(universalAst), /frontier\.lang\.universalAst/);
+assert.match(hashUniversalAstEnvelope(universalAst), /^fnv1a32:/);
 const importResult = createImportResult({
   id: 'import_todo_ts',
   language: 'typescript',
   sourcePath: 'src/todo.ts',
   document,
   nativeAst,
+  semanticIndex,
+  universalAst,
   losses: nativeAst.losses,
   evidence: [{ id: 'import_parse', kind: 'import', status: 'passed', summary: 'Parsed TypeScript native AST with one loss record.' }]
 });
 assert.equal(importResult.nativeAst.nodes.native_todo_interface.kind, 'InterfaceDeclaration');
+assert.equal(importResult.semanticIndex.symbols[0].id, 'symbol:Todo');
+assert.equal(importResult.universalAst.semanticIndex.id, 'index_todo');
 assert.match(importResult.losses[0].message, /Decorator/);
 assert.match(
   validateDocument(createDocument({ id: 'bad', name: 'Bad', nodes: [
