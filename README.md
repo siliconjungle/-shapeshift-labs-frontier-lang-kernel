@@ -2,6 +2,22 @@
 
 Runtime-neutral semantic source graph, patch, replay, hashing, and merge-admission kernel for Frontier Lang.
 
+```js
+import { capabilityNode, createDocument } from '@shapeshift-labs/frontier-lang-kernel';
+
+const http = capabilityNode({
+  id: 'cap_http',
+  name: 'HttpRequest',
+  capability: 'http.request',
+  category: 'network',
+  adapters: [
+    { target: { language: 'typescript', platform: 'node' }, symbol: 'fetch', kind: 'host' },
+    { target: { language: 'rust', platform: 'native', packageName: 'reqwest' }, symbol: 'reqwest::Client::execute', kind: 'library' }
+  ]
+});
+
+const document = createDocument({ id: 'mod_app', name: 'App', nodes: [http] });
+```
 
 ## Related Packages
 

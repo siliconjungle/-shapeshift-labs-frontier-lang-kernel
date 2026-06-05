@@ -10,10 +10,12 @@ export type NodeKind =
   | "view"
   | "migration"
   | "effect"
+  | "capability"
   | "target"
   | "type"
   | "extern"
-  | "lattice";
+  | "lattice"
+  | "nativeSource";
 export type MergePolicyKind = "conflict" | "union" | "max" | "lastWriterWins" | "byKey" | "preserveMoves" | "manual" | "custom";
 export type MergeLaw = "semilattice" | "commutative" | "associative" | "idempotent";
 
@@ -40,11 +42,87 @@ export interface BaseNode {
   readonly metadata?: JsonObject;
 }
 
+export type FrontierSourceLanguage =
+  | "typescript"
+  | "javascript"
+  | "rust"
+  | "python"
+  | "c"
+  | "cpp"
+  | "go"
+  | "java"
+  | "kotlin"
+  | "csharp"
+  | "swift"
+  | "wasm"
+  | string;
+
+export interface SourceSpan {
+  readonly sourceId?: string;
+  readonly path?: string;
+  readonly start?: number;
+  readonly end?: number;
+  readonly startLine?: number;
+  readonly startColumn?: number;
+  readonly endLine?: number;
+  readonly endColumn?: number;
+}
+
+export interface NativeAstNode {
+  readonly id: string;
+  readonly kind: string;
+  readonly languageKind?: string;
+  readonly span?: SourceSpan;
+  readonly value?: JsonValue;
+  readonly fields?: Readonly<Record<string, JsonValue | readonly string[] | string | null>>;
+  readonly children?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface NativeAstLossRecord {
+  readonly id: string;
+  readonly severity: "info" | "warning" | "error";
+  readonly kind:
+    | "unsupportedSyntax"
+    | "unsupportedSemantic"
+    | "opaqueNative"
+    | "missingTypeInfo"
+    | "macroExpansion"
+    | "preprocessor"
+    | "dynamicRuntime"
+    | "unresolvedSymbol"
+    | "nonRoundTrippable"
+    | string;
+  readonly message: string;
+  readonly span?: SourceSpan;
+  readonly nodeId?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface NativeAstRecord {
+  readonly kind: "frontier.lang.nativeAst";
+  readonly version: 1;
+  readonly id: string;
+  readonly language: FrontierSourceLanguage;
+  readonly parser?: string;
+  readonly parserVersion?: string;
+  readonly sourcePath?: string;
+  readonly sourceHash?: string;
+  readonly rootId: string;
+  readonly nodes: Readonly<Record<string, NativeAstNode>>;
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly metadata?: JsonObject;
+}
+
 export interface CompileTarget {
   readonly language: "typescript" | "javascript" | string;
+  readonly platform?: "node" | "browser" | "server" | "native" | "wasm" | "embedded" | string;
+  readonly framework?: string;
   readonly packageName?: string;
+  readonly adapterPackage?: string;
   readonly emitPath?: string;
   readonly moduleFormat?: "esm" | "commonjs";
+  readonly features?: readonly string[];
 }
 
 export type TypeExpression =
@@ -145,7 +223,40 @@ export interface MigrationNode extends BaseNode {
 export interface EffectNode extends BaseNode {
   readonly kind: "effect";
   readonly capability: string;
+  readonly input?: TypeExpression;
+  readonly returns?: TypeExpression;
   readonly resources?: readonly string[];
+  readonly semantics?: JsonObject;
+}
+
+export interface CapabilityAdapterBinding {
+  readonly target: CompileTarget;
+  readonly symbol: string;
+  readonly packageName?: string;
+  readonly importPath?: string;
+  readonly kind?: "host" | "library" | "native" | "generated" | "extern" | string;
+  readonly requires?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface CapabilityUnsupportedTarget {
+  readonly target: CompileTarget;
+  readonly reason: string;
+  readonly fallbackCapability?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface CapabilityNode extends BaseNode {
+  readonly kind: "capability";
+  readonly capability: string;
+  readonly category?: "network" | "storage" | "render" | "time" | "process" | "crypto" | "filesystem" | "custom" | string;
+  readonly input?: TypeExpression;
+  readonly returns?: TypeExpression;
+  readonly effects?: readonly string[];
+  readonly resources?: readonly string[];
+  readonly semantics?: JsonObject;
+  readonly adapters?: readonly CapabilityAdapterBinding[];
+  readonly unsupportedTargets?: readonly CapabilityUnsupportedTarget[];
 }
 
 export interface TargetNode extends BaseNode {
@@ -166,6 +277,7 @@ export interface ExternNode extends BaseNode {
   readonly kind: "extern";
   readonly language: string;
   readonly symbol: string;
+  readonly capability?: string;
   readonly signature?: {
     readonly input?: TypeExpression;
     readonly returns?: TypeExpression;
@@ -187,6 +299,20 @@ export interface LatticeNode extends BaseNode {
   };
 }
 
+export interface NativeSourceNode extends BaseNode {
+  readonly kind: "nativeSource";
+  readonly language: FrontierSourceLanguage;
+  readonly parser?: string;
+  readonly parserVersion?: string;
+  readonly sourcePath?: string;
+  readonly sourceHash?: string;
+  readonly symbol?: string;
+  readonly ast?: NativeAstRecord;
+  readonly frontierNodeIds?: readonly SemanticId[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly target?: CompileTarget;
+}
+
 export type SemanticNode =
   | ModuleNode
   | EntityNode
@@ -195,10 +321,12 @@ export type SemanticNode =
   | ViewNode
   | MigrationNode
   | EffectNode
+  | CapabilityNode
   | TargetNode
   | TypeNode
   | ExternNode
-  | LatticeNode;
+  | LatticeNode
+  | NativeSourceNode;
 
 export interface FrontierLangDocument {
   readonly kind: "frontier.lang.document";
@@ -221,10 +349,24 @@ export type SemanticPatchOperation =
 
 export interface EvidenceRecord {
   readonly id: string;
-  readonly kind: "typecheck" | "test" | "replay" | "proof" | "trace" | "review" | "note";
+  readonly kind: "typecheck" | "test" | "replay" | "proof" | "trace" | "review" | "note" | "import";
   readonly status: "passed" | "failed" | "unknown";
   readonly path?: string;
   readonly summary?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface LanguageImportResult {
+  readonly kind: "frontier.lang.importResult";
+  readonly version: 1;
+  readonly id: string;
+  readonly language: FrontierSourceLanguage;
+  readonly sourcePath?: string;
+  readonly document: FrontierLangDocument;
+  readonly patch?: SemanticPatchBundle;
+  readonly nativeAst?: NativeAstRecord;
+  readonly losses: readonly NativeAstLossRecord[];
+  readonly evidence: readonly EvidenceRecord[];
   readonly metadata?: JsonObject;
 }
 
@@ -275,10 +417,14 @@ export declare function actionNode(input: Omit<ActionNode, "kind">): ActionNode;
 export declare function viewNode(input: Omit<ViewNode, "kind">): ViewNode;
 export declare function migrationNode(input: Omit<MigrationNode, "kind">): MigrationNode;
 export declare function effectNode(input: Omit<EffectNode, "kind">): EffectNode;
+export declare function capabilityNode(input: Omit<CapabilityNode, "kind">): CapabilityNode;
 export declare function targetNode(input: Omit<TargetNode, "kind">): TargetNode;
 export declare function typeNode(input: Omit<TypeNode, "kind">): TypeNode;
 export declare function externNode(input: Omit<ExternNode, "kind">): ExternNode;
 export declare function latticeNode(input: Omit<LatticeNode, "kind">): LatticeNode;
+export declare function nativeSourceNode(input: Omit<NativeSourceNode, "kind">): NativeSourceNode;
+export declare function createNativeAstRecord(input: Omit<NativeAstRecord, "kind" | "version">): NativeAstRecord;
+export declare function createImportResult(input: Omit<LanguageImportResult, "kind" | "version">): LanguageImportResult;
 export declare function createPatch(input: Omit<SemanticPatchBundle, "kind" | "version">): SemanticPatchBundle;
 export declare function createDocument(input: {
   readonly id: SemanticId;

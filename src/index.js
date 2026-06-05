@@ -26,6 +26,10 @@ export function effectNode(input) {
   return { ...input, kind: "effect" };
 }
 
+export function capabilityNode(input) {
+  return { ...input, kind: "capability" };
+}
+
 export function targetNode(input) {
   return { ...input, kind: "target" };
 }
@@ -40,6 +44,26 @@ export function externNode(input) {
 
 export function latticeNode(input) {
   return { ...input, kind: "lattice" };
+}
+
+export function nativeSourceNode(input) {
+  return { ...input, kind: "nativeSource" };
+}
+
+export function createNativeAstRecord(input) {
+  return {
+    ...input,
+    kind: "frontier.lang.nativeAst",
+    version: 1
+  };
+}
+
+export function createImportResult(input) {
+  return {
+    ...input,
+    kind: "frontier.lang.importResult",
+    version: 1
+  };
 }
 
 export function createPatch(input) {
@@ -204,12 +228,46 @@ export function validateDocument(document) {
       }
     }
 
+    if (node.kind === "capability") {
+      if (!node.capability) {
+        issues.push(`Capability ${node.id} is missing capability`);
+      }
+      const adapterKeys = new Set();
+      for (const adapter of node.adapters ?? []) {
+        if (!adapter.target?.language) {
+          issues.push(`Capability ${node.id} has adapter without target language`);
+        }
+        if (!adapter.symbol) {
+          issues.push(`Capability ${node.id} has adapter without symbol`);
+        }
+        const key = `${adapter.target?.language ?? ""}:${adapter.target?.platform ?? ""}:${adapter.symbol ?? ""}`;
+        if (adapterKeys.has(key)) {
+          issues.push(`Capability ${node.id} has duplicate adapter ${key}`);
+        }
+        adapterKeys.add(key);
+      }
+    }
+
     if (node.kind === "lattice") {
       if (!Array.isArray(node.laws) || node.laws.length === 0) {
         issues.push(`Lattice ${node.id} must declare at least one law`);
       }
       for (const duplicate of duplicateValues(node.laws ?? [])) {
         issues.push(`Lattice ${node.id} has duplicate law ${duplicate}`);
+      }
+    }
+
+    if (node.kind === "nativeSource") {
+      if (!node.language) {
+        issues.push(`Native source ${node.id} is missing language`);
+      }
+      if (node.ast && node.ast.kind !== "frontier.lang.nativeAst") {
+        issues.push(`Native source ${node.id} has invalid native AST record`);
+      }
+      for (const mappedId of node.frontierNodeIds ?? []) {
+        if (!nodeIds.has(mappedId)) {
+          issues.push(`Native source ${node.id} maps to missing semantic node ${mappedId}`);
+        }
       }
     }
   }

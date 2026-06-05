@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import {
   applySemanticPatch,
+  capabilityNode,
   classifyMerge,
   createDocument,
+  createImportResult,
+  createNativeAstRecord,
   createPatch,
   entityNode,
+  effectNode,
   externNode,
   hashDocumentBase,
   latticeNode,
+  nativeSourceNode,
   replayDocument,
   typeNode,
   validateDocument
@@ -40,6 +45,52 @@ const saveTodo = externNode({
   signature: { input: 'TodoInput', returns: 'Patch' },
   effects: ['storage']
 });
+const httpRequest = capabilityNode({
+  id: 'cap_http_request',
+  name: 'HttpRequest',
+  capability: 'http.request',
+  category: 'network',
+  input: 'Json',
+  returns: 'Json',
+  adapters: [
+    { target: { language: 'typescript', platform: 'node', packageName: 'undici' }, symbol: 'fetch', kind: 'library' },
+    { target: { language: 'rust', platform: 'native', packageName: 'reqwest' }, symbol: 'reqwest::Client::execute', kind: 'library' }
+  ],
+  unsupportedTargets: [
+    { target: { language: 'c', platform: 'embedded' }, reason: 'Requires a host socket adapter.' }
+  ]
+});
+const fetchTodo = effectNode({
+  id: 'effect_fetch_todo',
+  name: 'FetchTodo',
+  capability: 'http.request',
+  input: 'Json',
+  returns: 'Json',
+  resources: ['network']
+});
+const nativeAst = createNativeAstRecord({
+  id: 'native_ts_todo',
+  language: 'typescript',
+  parser: 'typescript',
+  sourcePath: 'src/todo.ts',
+  sourceHash: 'sha256:example',
+  rootId: 'native_root',
+  nodes: {
+    native_root: {
+      id: 'native_root',
+      kind: 'SourceFile',
+      languageKind: 'ts.SourceFile',
+      children: ['native_todo_interface']
+    },
+    native_todo_interface: {
+      id: 'native_todo_interface',
+      kind: 'InterfaceDeclaration',
+      languageKind: 'ts.InterfaceDeclaration',
+      span: { path: 'src/todo.ts', startLine: 1, startColumn: 1, endLine: 4, endColumn: 2 }
+    }
+  },
+  losses: [{ id: 'loss_decorator', severity: 'warning', kind: 'unsupportedSyntax', message: 'Decorator retained as native AST metadata.' }]
+});
 const todo = entityNode({ id: 'ent_todo', name: 'Todo', fields: [
   { id: 'field_title', name: 'title', type: 'Text', merge: { kind: 'conflict' } },
   {
@@ -50,8 +101,31 @@ const todo = entityNode({ id: 'ent_todo', name: 'Todo', fields: [
     semantic: { kind: 'crdt', latticeId: 'TagSet', crdt: { packageName: '@shapeshift-labs/frontier-crdt', exportName: 'createCrdtOrSetLattice', type: 'or-set' } }
   }
 ] });
-const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, todo] });
+const nativeTodo = nativeSourceNode({
+  id: 'native_source_todo',
+  name: 'Todo.ts',
+  language: 'typescript',
+  parser: 'typescript',
+  sourcePath: 'src/todo.ts',
+  sourceHash: 'sha256:example',
+  ast: nativeAst,
+  frontierNodeIds: ['ent_todo'],
+  losses: nativeAst.losses
+});
+const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, httpRequest, fetchTodo, todo, nativeTodo] });
 assert.deepEqual(validateDocument(document), []);
+assert.equal(document.nodes.cap_http_request.adapters[1].target.language, 'rust');
+const importResult = createImportResult({
+  id: 'import_todo_ts',
+  language: 'typescript',
+  sourcePath: 'src/todo.ts',
+  document,
+  nativeAst,
+  losses: nativeAst.losses,
+  evidence: [{ id: 'import_parse', kind: 'import', status: 'passed', summary: 'Parsed TypeScript native AST with one loss record.' }]
+});
+assert.equal(importResult.nativeAst.nodes.native_todo_interface.kind, 'InterfaceDeclaration');
+assert.match(importResult.losses[0].message, /Decorator/);
 assert.match(
   validateDocument(createDocument({ id: 'bad', name: 'Bad', nodes: [
     entityNode({ id: 'bad_entity', name: 'Bad', fields: [
