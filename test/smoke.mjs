@@ -5,17 +5,61 @@ import {
   createDocument,
   createPatch,
   entityNode,
+  externNode,
   hashDocumentBase,
+  latticeNode,
   replayDocument,
+  typeNode,
   validateDocument
 } from '../dist/index.js';
 
+const tagSet = latticeNode({
+  id: 'lat_tag_set',
+  name: 'TagSet',
+  carrier: 'Set<Text>',
+  laws: ['semilattice', 'commutative', 'associative', 'idempotent'],
+  frontierCrdt: {
+    packageName: '@shapeshift-labs/frontier-crdt',
+    exportName: 'createCrdtOrSetLattice',
+    lawChecker: 'checkCrdtJoinLaws'
+  }
+});
+const todoType = typeNode({
+  id: 'type_todo_input',
+  name: 'TodoInput',
+  fields: [
+    { id: 'todo_input_title', name: 'title', type: 'Text' },
+    { id: 'todo_input_tags', name: 'tags', type: { kind: 'set', item: 'Text' } }
+  ]
+});
+const saveTodo = externNode({
+  id: 'extern_save_todo',
+  name: 'saveTodo',
+  language: 'typescript',
+  symbol: 'saveTodo',
+  signature: { input: 'TodoInput', returns: 'Patch' },
+  effects: ['storage']
+});
 const todo = entityNode({ id: 'ent_todo', name: 'Todo', fields: [
   { id: 'field_title', name: 'title', type: 'Text', merge: { kind: 'conflict' } },
-  { id: 'field_tags', name: 'tags', type: 'Set<Text>', merge: { kind: 'union', law: 'semilattice' } }
+  {
+    id: 'field_tags',
+    name: 'tags',
+    type: 'Set<Text>',
+    merge: { kind: 'union', latticeId: 'lat_tag_set' },
+    semantic: { kind: 'crdt', latticeId: 'TagSet', crdt: { packageName: '@shapeshift-labs/frontier-crdt', exportName: 'createCrdtOrSetLattice', type: 'or-set' } }
+  }
 ] });
-const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [todo] });
+const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, todo] });
 assert.deepEqual(validateDocument(document), []);
+assert.match(
+  validateDocument(createDocument({ id: 'bad', name: 'Bad', nodes: [
+    entityNode({ id: 'bad_entity', name: 'Bad', fields: [
+      { id: 'bad_field', name: 'value', type: 'Text', merge: { kind: 'union', latticeId: 'missing_lattice' } }
+    ] })
+  ] })).join('\n'),
+  /missing lattice/
+);
 const baseHash = hashDocumentBase(document);
 const rename = createPatch({ id: 'rename', baseHash, operations: [{ op: 'renameNode', id: 'ent_todo', name: 'Task' }] });
 assert.equal(applySemanticPatch(document, rename).nodes.ent_todo.name, 'Task');

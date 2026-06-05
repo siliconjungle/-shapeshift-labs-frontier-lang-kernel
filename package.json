@@ -1,6 +1,6 @@
 {
   "name": "@shapeshift-labs/frontier-lang-kernel",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Runtime-neutral semantic source graph, patch, replay, hashing, and merge-admission kernel for Frontier Lang.",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,8 +21,13 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "npm run build && node test/smoke.mjs",
+    "fuzz": "npm run build && node fuzz/smoke.mjs",
+    "bench": "npm run build && node bench/smoke.mjs",
     "prepare": "npm run build",
-    "prepack": "npm test"
+    "prepack": "npm test",
+    "pack:dry": "npm pack --dry-run",
+    "readme:packages": "node benchmarks/package-readme-sections.mjs",
+    "readme:packages:check": "node benchmarks/package-readme-sections.mjs --check"
   },
   "keywords": [
     "frontier",

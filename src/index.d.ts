@@ -2,12 +2,26 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonObject = { readonly [key: string]: JsonValue };
 export type SemanticId = string;
-export type NodeKind = "module" | "entity" | "state" | "action" | "view" | "migration" | "effect" | "target";
+export type NodeKind =
+  | "module"
+  | "entity"
+  | "state"
+  | "action"
+  | "view"
+  | "migration"
+  | "effect"
+  | "target"
+  | "type"
+  | "extern"
+  | "lattice";
 export type MergePolicyKind = "conflict" | "union" | "max" | "lastWriterWins" | "byKey" | "preserveMoves" | "manual" | "custom";
+export type MergeLaw = "semilattice" | "commutative" | "associative" | "idempotent";
 
 export interface MergePolicy {
   readonly kind: MergePolicyKind;
-  readonly law?: "semilattice" | "commutative" | "associative" | "idempotent";
+  readonly law?: MergeLaw;
+  readonly laws?: readonly MergeLaw[];
+  readonly latticeId?: SemanticId | string;
   readonly condition?: string;
   readonly customName?: string;
 }
@@ -33,6 +47,41 @@ export interface CompileTarget {
   readonly moduleFormat?: "esm" | "commonjs";
 }
 
+export type TypeExpression =
+  | string
+  | { readonly kind: "ref"; readonly name: string; readonly args?: readonly TypeExpression[] }
+  | { readonly kind: "list"; readonly item: TypeExpression }
+  | { readonly kind: "set"; readonly item: TypeExpression }
+  | { readonly kind: "map"; readonly key: TypeExpression; readonly value: TypeExpression }
+  | { readonly kind: "record"; readonly fields: readonly TypeFieldDeclaration[] }
+  | { readonly kind: "union"; readonly variants: readonly TypeVariantDeclaration[] };
+
+export interface TypeFieldDeclaration {
+  readonly id: SemanticId;
+  readonly name: string;
+  readonly type: TypeExpression;
+  readonly optional?: boolean;
+  readonly metadata?: JsonObject;
+}
+
+export interface TypeVariantDeclaration {
+  readonly id?: SemanticId;
+  readonly name: string;
+  readonly fields?: readonly TypeFieldDeclaration[];
+  readonly metadata?: JsonObject;
+}
+
+export interface SemanticValueSemantics {
+  readonly kind: "plain" | "lattice" | "crdt";
+  readonly latticeId?: SemanticId | string;
+  readonly crdt?: {
+    readonly packageName?: string;
+    readonly exportName?: string;
+    readonly type?: "g-counter" | "pn-counter" | "or-set" | "mv-register" | "or-map" | string;
+  };
+  readonly metadata?: JsonObject;
+}
+
 export interface ModuleNode extends BaseNode {
   readonly kind: "module";
   readonly imports?: readonly string[];
@@ -42,9 +91,10 @@ export interface ModuleNode extends BaseNode {
 export interface FieldDeclaration {
   readonly id: SemanticId;
   readonly name: string;
-  readonly type: string;
+  readonly type: TypeExpression;
   readonly key?: boolean;
   readonly merge?: MergePolicy;
+  readonly semantic?: SemanticValueSemantics;
   readonly metadata?: JsonObject;
 }
 
@@ -56,8 +106,10 @@ export interface EntityNode extends BaseNode {
 export interface StateCollection {
   readonly id: SemanticId;
   readonly name: string;
-  readonly type: string;
+  readonly type: TypeExpression;
   readonly merge?: MergePolicy;
+  readonly semantic?: SemanticValueSemantics;
+  readonly metadata?: JsonObject;
 }
 
 export interface StateNode extends BaseNode {
@@ -67,8 +119,8 @@ export interface StateNode extends BaseNode {
 
 export interface ActionNode extends BaseNode {
   readonly kind: "action";
-  readonly input?: string;
-  readonly returns?: string;
+  readonly input?: TypeExpression;
+  readonly returns?: TypeExpression;
   readonly reads?: readonly string[];
   readonly writes?: readonly string[];
   readonly uses?: readonly string[];
@@ -101,7 +153,52 @@ export interface TargetNode extends BaseNode {
   readonly target: CompileTarget;
 }
 
-export type SemanticNode = ModuleNode | EntityNode | StateNode | ActionNode | ViewNode | MigrationNode | EffectNode | TargetNode;
+export interface TypeNode extends BaseNode {
+  readonly kind: "type";
+  readonly parameters?: readonly string[];
+  readonly type?: TypeExpression;
+  readonly fields?: readonly TypeFieldDeclaration[];
+  readonly variants?: readonly TypeVariantDeclaration[];
+  readonly invariants?: readonly string[];
+}
+
+export interface ExternNode extends BaseNode {
+  readonly kind: "extern";
+  readonly language: string;
+  readonly symbol: string;
+  readonly signature?: {
+    readonly input?: TypeExpression;
+    readonly returns?: TypeExpression;
+  };
+  readonly effects?: readonly string[];
+  readonly resources?: readonly string[];
+  readonly target?: CompileTarget;
+}
+
+export interface LatticeNode extends BaseNode {
+  readonly kind: "lattice";
+  readonly carrier: TypeExpression;
+  readonly laws: readonly MergeLaw[];
+  readonly identity?: JsonValue;
+  readonly frontierCrdt?: {
+    readonly packageName?: "@shapeshift-labs/frontier-crdt" | string;
+    readonly exportName: string;
+    readonly lawChecker?: string;
+  };
+}
+
+export type SemanticNode =
+  | ModuleNode
+  | EntityNode
+  | StateNode
+  | ActionNode
+  | ViewNode
+  | MigrationNode
+  | EffectNode
+  | TargetNode
+  | TypeNode
+  | ExternNode
+  | LatticeNode;
 
 export interface FrontierLangDocument {
   readonly kind: "frontier.lang.document";
@@ -179,6 +276,9 @@ export declare function viewNode(input: Omit<ViewNode, "kind">): ViewNode;
 export declare function migrationNode(input: Omit<MigrationNode, "kind">): MigrationNode;
 export declare function effectNode(input: Omit<EffectNode, "kind">): EffectNode;
 export declare function targetNode(input: Omit<TargetNode, "kind">): TargetNode;
+export declare function typeNode(input: Omit<TypeNode, "kind">): TypeNode;
+export declare function externNode(input: Omit<ExternNode, "kind">): ExternNode;
+export declare function latticeNode(input: Omit<LatticeNode, "kind">): LatticeNode;
 export declare function createPatch(input: Omit<SemanticPatchBundle, "kind" | "version">): SemanticPatchBundle;
 export declare function createDocument(input: {
   readonly id: SemanticId;

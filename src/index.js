@@ -30,6 +30,18 @@ export function targetNode(input) {
   return { ...input, kind: "target" };
 }
 
+export function typeNode(input) {
+  return { ...input, kind: "type" };
+}
+
+export function externNode(input) {
+  return { ...input, kind: "extern" };
+}
+
+export function latticeNode(input) {
+  return { ...input, kind: "lattice" };
+}
+
 export function createPatch(input) {
   return {
     ...input,
@@ -92,6 +104,8 @@ export function hashDocumentBase(document) {
 export function validateDocument(document) {
   const issues = [];
   const rootSet = new Set();
+  const nodeIds = new Set(Object.keys(document.nodes));
+  const nodeNames = new Map();
 
   for (const rootId of document.rootIds) {
     if (rootSet.has(rootId)) {
@@ -104,6 +118,10 @@ export function validateDocument(document) {
   }
 
   for (const [nodeId, node] of Object.entries(document.nodes)) {
+    const namedNodes = nodeNames.get(node.name) ?? [];
+    namedNodes.push(node);
+    nodeNames.set(node.name, namedNodes);
+
     if (node.id !== nodeId) {
       issues.push(`Node record key ${nodeId} does not match node id ${node.id}`);
     }
@@ -130,11 +148,68 @@ export function validateDocument(document) {
 
     if (node.kind === "entity") {
       const fieldIds = new Set();
+      const fieldNames = new Set();
       for (const field of node.fields) {
         if (fieldIds.has(field.id)) {
           issues.push(`Entity ${node.id} has duplicate field id ${field.id}`);
         }
         fieldIds.add(field.id);
+        if (fieldNames.has(field.name)) {
+          issues.push(`Entity ${node.id} has duplicate field name ${field.name}`);
+        }
+        fieldNames.add(field.name);
+        validateLatticeReference(document, nodeIds, nodeNames, field.merge?.latticeId, `Entity ${node.id} field ${field.name}`, issues);
+        validateLatticeReference(document, nodeIds, nodeNames, field.semantic?.latticeId, `Entity ${node.id} field ${field.name}`, issues);
+      }
+    }
+
+    if (node.kind === "state") {
+      const collectionIds = new Set();
+      const collectionNames = new Set();
+      for (const collection of node.collections) {
+        if (collectionIds.has(collection.id)) {
+          issues.push(`State ${node.id} has duplicate collection id ${collection.id}`);
+        }
+        collectionIds.add(collection.id);
+        if (collectionNames.has(collection.name)) {
+          issues.push(`State ${node.id} has duplicate collection name ${collection.name}`);
+        }
+        collectionNames.add(collection.name);
+        validateLatticeReference(document, nodeIds, nodeNames, collection.merge?.latticeId, `State ${node.id} collection ${collection.name}`, issues);
+        validateLatticeReference(document, nodeIds, nodeNames, collection.semantic?.latticeId, `State ${node.id} collection ${collection.name}`, issues);
+      }
+    }
+
+    if (node.kind === "type") {
+      for (const duplicate of duplicateValues(node.parameters ?? [])) {
+        issues.push(`Type ${node.id} has duplicate parameter ${duplicate}`);
+      }
+      for (const duplicate of duplicateValues((node.fields ?? []).map((field) => field.id))) {
+        issues.push(`Type ${node.id} has duplicate field id ${duplicate}`);
+      }
+      for (const duplicate of duplicateValues((node.fields ?? []).map((field) => field.name))) {
+        issues.push(`Type ${node.id} has duplicate field name ${duplicate}`);
+      }
+      for (const duplicate of duplicateValues((node.variants ?? []).map((variant) => variant.name))) {
+        issues.push(`Type ${node.id} has duplicate variant ${duplicate}`);
+      }
+    }
+
+    if (node.kind === "extern") {
+      if (!node.language) {
+        issues.push(`Extern ${node.id} is missing language`);
+      }
+      if (!node.symbol) {
+        issues.push(`Extern ${node.id} is missing symbol`);
+      }
+    }
+
+    if (node.kind === "lattice") {
+      if (!Array.isArray(node.laws) || node.laws.length === 0) {
+        issues.push(`Lattice ${node.id} must declare at least one law`);
+      }
+      for (const duplicate of duplicateValues(node.laws ?? [])) {
+        issues.push(`Lattice ${node.id} has duplicate law ${duplicate}`);
       }
     }
   }
@@ -317,7 +392,7 @@ export function classifyMerge(base, left, right) {
 
   if (overlappingNodeIds.length > 0 || overlappingRegions.length > 0) {
     const laws = collectMergeLaws(base, [...overlappingNodeIds, ...overlappingRegions]);
-    if (laws.length > 0 && laws.every((law) => law === "semilattice" || law === "commutative")) {
+    if (hasAutoMergeLawSet(laws)) {
       return withReplayGate(base, left, right, {
         status: "safe-by-merge-law",
         autoMergeable: true,
@@ -491,12 +566,19 @@ function collectMergeLaws(document, overlaps) {
   const laws = [];
 
   for (const node of Object.values(document.nodes)) {
+    if (node.kind === "lattice" && (overlapSet.has(node.id) || overlapSet.has(node.name))) {
+      laws.push(...(node.laws ?? []));
+    }
+
     if (node.kind === "entity") {
       for (const field of node.fields) {
         if (overlapSet.has(field.id) || overlapSet.has(`${node.name}.${field.name}`)) {
           if (field.merge?.law) {
             laws.push(field.merge.law);
           }
+          laws.push(...(field.merge?.laws ?? []));
+          laws.push(...collectReferencedLatticeLaws(document, field.merge?.latticeId));
+          laws.push(...collectReferencedLatticeLaws(document, field.semantic?.latticeId));
         }
       }
     }
@@ -506,12 +588,71 @@ function collectMergeLaws(document, overlaps) {
           if (collection.merge?.law) {
             laws.push(collection.merge.law);
           }
+          laws.push(...(collection.merge?.laws ?? []));
+          laws.push(...collectReferencedLatticeLaws(document, collection.merge?.latticeId));
+          laws.push(...collectReferencedLatticeLaws(document, collection.semantic?.latticeId));
         }
       }
     }
   }
 
   return laws;
+}
+
+function validateLatticeReference(document, nodeIds, nodeNames, latticeId, context, issues) {
+  if (!latticeId) {
+    return;
+  }
+  if (nodeIds.has(latticeId)) {
+    const node = document.nodes[latticeId];
+    if (node?.kind !== "lattice") {
+      issues.push(`${context} references non-lattice node ${latticeId}`);
+    }
+    return;
+  }
+  const matches = nodeNames.get(latticeId) ?? [];
+  if (matches.some((node) => node.kind === "lattice")) {
+    return;
+  }
+  issues.push(`${context} references missing lattice ${latticeId}`);
+}
+
+function collectReferencedLatticeLaws(document, latticeId) {
+  if (!latticeId) {
+    return [];
+  }
+  const direct = document.nodes[latticeId];
+  if (direct?.kind === "lattice") {
+    return direct.laws ?? [];
+  }
+  const byName = Object.values(document.nodes).find((node) => node.kind === "lattice" && node.name === latticeId);
+  return byName?.laws ?? [];
+}
+
+function hasAutoMergeLawSet(laws) {
+  if (laws.length === 0) {
+    return false;
+  }
+  const allowed = new Set(["semilattice", "commutative", "associative", "idempotent"]);
+  if (!laws.every((law) => allowed.has(law))) {
+    return false;
+  }
+  return laws.includes("semilattice") || laws.includes("commutative");
+}
+
+function duplicateValues(values) {
+  const seen = new Set();
+  const duplicates = [];
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    if (seen.has(value) && !duplicates.includes(value)) {
+      duplicates.push(value);
+    }
+    seen.add(value);
+  }
+  return duplicates;
 }
 
 function intersection(left, right) {
