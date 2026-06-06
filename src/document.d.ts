@@ -1,4 +1,17 @@
-import type { FrontierSourceLanguage, JsonObject, JsonValue, BaseNode, CompileTarget, MergeLaw, MergePolicy, SemanticId } from "./base.js";
+import type {
+  BaseNode,
+  CompileTarget,
+  FrontierSourceLanguage,
+  JsonObject,
+  JsonValue,
+  MergeLaw,
+  MergePolicy,
+  SemanticId,
+  SemanticValueSemantics,
+  TypeExpression,
+  TypeFieldDeclaration,
+  TypeVariantDeclaration
+} from "./base.js";
 import type { NativeAstLossRecord, NativeAstRecord } from "./source-records.js";
 import type { ReplayEvent } from "./patching.js";
 
