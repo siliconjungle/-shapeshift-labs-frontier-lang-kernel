@@ -44,6 +44,7 @@ export const UniversalAstLayerNames = Object.freeze([
   "controlFlow",
   "dataFlow",
   "proofSpec",
+  "paradigmSemantics",
   "runtimeModel",
   "projectionEvidence",
   "mergeEvidence"
@@ -67,6 +68,7 @@ export const UniversalAstReferenceKinds = Object.freeze([
   "proofObligation",
   "proofArtifact",
   "proofAssumption",
+  "paradigmRecord",
   "loss",
   "evidence",
   "effect"
@@ -102,6 +104,50 @@ export const ProofArtifactKinds = Object.freeze([
   "manualReview",
   "testEvidence"
 ]);
+
+export const ParadigmSemanticsRecordGroups = Object.freeze([
+  "bindingScopes",
+  "bindings",
+  "patterns",
+  "typeConstraints",
+  "evaluationModels",
+  "memoryLocations",
+  "effectRegions",
+  "controlRegions",
+  "logicPrograms",
+  "actorSystems",
+  "stackEffects",
+  "arrayShapes",
+  "numericKernels",
+  "dataflowNetworks",
+  "clockModels",
+  "objectModels",
+  "macroExpansions",
+  "reflectionBoundaries",
+  "loweringRecords"
+]);
+
+const ParadigmSemanticsRecordPrefixes = Object.freeze({
+  bindingScopes: "bindingScope",
+  bindings: "binding",
+  patterns: "pattern",
+  typeConstraints: "typeConstraint",
+  evaluationModels: "evaluationModel",
+  memoryLocations: "memoryLocation",
+  effectRegions: "effectRegion",
+  controlRegions: "controlRegion",
+  logicPrograms: "logicProgram",
+  actorSystems: "actorSystem",
+  stackEffects: "stackEffect",
+  arrayShapes: "arrayShape",
+  numericKernels: "numericKernel",
+  dataflowNetworks: "dataflowNetwork",
+  clockModels: "clockModel",
+  objectModels: "objectModel",
+  macroExpansions: "macroExpansion",
+  reflectionBoundaries: "reflectionBoundary",
+  loweringRecords: "loweringRecord"
+});
 
 export function moduleNode(input) {
   return { ...input, kind: "module" };
@@ -231,6 +277,21 @@ export function createProofSpecLayer(input = {}) {
     obligations,
     artifacts,
     assumptions,
+    evidence: input.evidence ?? []
+  };
+}
+
+export function createParadigmSemanticsLayer(input = {}) {
+  const records = {};
+  for (const group of ParadigmSemanticsRecordGroups) {
+    records[group] = normalizeParadigmRecords(input[group], ParadigmSemanticsRecordPrefixes[group]);
+  }
+  return {
+    ...input,
+    kind: "frontier.lang.paradigmSemantics",
+    version: 1,
+    id: input.id ?? "paradigm:semantics",
+    ...records,
     evidence: input.evidence ?? []
   };
 }
@@ -447,6 +508,35 @@ export function validateProofSpecLayer(proof, context = {}) {
   return issues;
 }
 
+export function validateParadigmSemanticsLayer(paradigmSemantics, context = {}) {
+  const issues = [];
+  if (!paradigmSemantics || typeof paradigmSemantics !== "object") {
+    return ["Paradigm semantics is not an object"];
+  }
+  const label = `Paradigm semantics ${paradigmSemantics.id ?? "(unknown)"}`;
+  const references = createUniversalAstReferenceIndex({ ...context, paradigmSemantics });
+  if (paradigmSemantics.kind !== "frontier.lang.paradigmSemantics") {
+    issues.push(`${label} has invalid kind`);
+  }
+  if (paradigmSemantics.version !== 1) {
+    issues.push(`${label} has unsupported version ${paradigmSemantics.version}`);
+  }
+  if (!paradigmSemantics.id) {
+    issues.push("Paradigm semantics is missing id");
+  }
+
+  const recordIds = collectUniqueIds(collectParadigmRecords(paradigmSemantics), "paradigm record", issues);
+  for (const group of ParadigmSemanticsRecordGroups) {
+    validateParadigmRecords(paradigmSemantics[group], group, recordIds, references, issues);
+  }
+  for (const evidence of paradigmSemantics.evidence ?? []) {
+    if (!evidence?.id) {
+      issues.push(`${label} has evidence without id`);
+    }
+  }
+  return issues;
+}
+
 export function validateUniversalAstLayer(layer, context = {}) {
   const issues = [];
   if (!layer || typeof layer !== "object") {
@@ -479,6 +569,7 @@ export function validateUniversalAstLayer(layer, context = {}) {
   validateReferenceIds(layer.sourceMapIds, references.sourceMapIds, "source map", label, references, issues);
   validateReferenceIds(layer.sourceMapMappingIds, references.sourceMapMappingIds, "source map mapping", label, references, issues);
   validateReferenceIds(layer.mergeCandidateIds, references.mergeCandidateIds, "merge candidate", label, references, issues);
+  validateReferenceIds(layer.paradigmRecordIds, references.paradigmRecordIds, "paradigm record", label, references, issues);
   validateReferenceIds(layer.lossIds, references.lossIds, "loss", label, references, issues);
   validateReferenceIds(layer.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
   validateReferenceIds(layer.effectIds, references.effectIds, "effect", label, references, issues);
@@ -584,6 +675,7 @@ export function createUniversalAstEnvelope(input) {
   const evidence = input.evidence ?? [];
   const mergeCandidates = input.mergeCandidates ?? [];
   const proof = input.proof ? createProofSpecLayer(input.proof) : undefined;
+  const paradigmSemantics = input.paradigmSemantics ? createParadigmSemanticsLayer(input.paradigmSemantics) : undefined;
   return {
     ...input,
     kind: "frontier.lang.universalAst",
@@ -595,6 +687,7 @@ export function createUniversalAstEnvelope(input) {
     evidence,
     mergeCandidates,
     ...(proof ? { proof } : {}),
+    ...(paradigmSemantics ? { paradigmSemantics } : {}),
     layers: normalizeUniversalAstLayers(input.layers, createDefaultUniversalAstLayers({
       nativeSources,
       semanticIndex: input.semanticIndex,
@@ -602,7 +695,8 @@ export function createUniversalAstEnvelope(input) {
       losses,
       evidence,
       mergeCandidates,
-      proof
+      proof,
+      paradigmSemantics
     }))
   };
 }
@@ -638,6 +732,9 @@ export function validateUniversalAstEnvelope(envelope) {
   }
   if (envelope.proof) {
     issues.push(...validateProofSpecLayer(envelope.proof, { envelope }).map((issue) => `proof: ${issue}`));
+  }
+  if (envelope.paradigmSemantics) {
+    issues.push(...validateParadigmSemanticsLayer(envelope.paradigmSemantics, { envelope }).map((issue) => `paradigmSemantics: ${issue}`));
   }
   for (const sourceMap of envelope.sourceMaps ?? []) {
     issues.push(...validateSourceMapRecord(sourceMap, {
@@ -2030,6 +2127,30 @@ function createDefaultUniversalAstLayers(input) {
     });
   }
 
+  if (input.paradigmSemantics) {
+    const records = collectParadigmRecordEntries(input.paradigmSemantics);
+    layers.paradigmSemantics = createUniversalAstLayer({
+      id: "layer:paradigmSemantics",
+      layer: "paradigmSemantics",
+      records: [{
+        paradigmSemanticsId: input.paradigmSemantics.id,
+        ...Object.fromEntries(ParadigmSemanticsRecordGroups.map((group) => [
+          group,
+          (input.paradigmSemantics[group] ?? []).length
+        ]))
+      }],
+      paradigmRecordIds: records.map((entry) => entry.record.id).filter(Boolean),
+      references: records
+        .filter((entry) => entry.record.id)
+        .map((entry) => ({
+          kind: "paradigmRecord",
+          id: entry.record.id,
+          metadata: { group: entry.group }
+        })),
+      evidenceIds: collectParadigmEvidenceIds(input.paradigmSemantics)
+    });
+  }
+
   if (input.mergeCandidates.length > 0 || input.evidence.length > 0) {
     layers.mergeEvidence = createUniversalAstLayer({
       id: "layer:mergeEvidence",
@@ -2095,6 +2216,7 @@ function createUniversalAstReferenceIndex(context = {}) {
   const mergeCandidates = context.mergeCandidates ?? envelope?.mergeCandidates ?? [];
   const layers = collectUniversalAstLayerRecords(context.layers ?? envelope?.layers);
   const proof = context.proof ?? envelope?.proof;
+  const paradigmSemantics = context.paradigmSemantics ?? envelope?.paradigmSemantics;
   const nativeAsts = uniqueById([
     context.nativeAst,
     ...nativeSources.map((source) => source.ast)
@@ -2113,6 +2235,7 @@ function createUniversalAstReferenceIndex(context = {}) {
     ...(envelope?.evidence ?? []),
     ...(semanticIndex?.evidence ?? []),
     ...(proof?.evidence ?? []),
+    ...(paradigmSemantics?.evidence ?? []),
     ...sourceMaps.flatMap((sourceMap) => sourceMap.evidence ?? []),
     ...mergeCandidates.flatMap((candidate) => candidate.evidence ?? [])
   ];
@@ -2149,6 +2272,7 @@ function createUniversalAstReferenceIndex(context = {}) {
     proofObligationIds: new Set((proof?.obligations ?? []).map((record) => record.id).filter(Boolean)),
     proofArtifactIds: new Set((proof?.artifacts ?? []).map((record) => record.id).filter(Boolean)),
     proofAssumptionIds: new Set((proof?.assumptions ?? []).map((record) => record.id).filter(Boolean)),
+    paradigmRecordIds: new Set(collectParadigmRecords(paradigmSemantics).map((record) => record.id).filter(Boolean)),
     lossIds: new Set(losses.map((loss) => loss.id).filter(Boolean)),
     evidenceIds: new Set(evidence.map((record) => record.id).filter(Boolean)),
     effectIds: collectEffectReferenceIds(document)
@@ -2179,6 +2303,85 @@ function normalizeProofRecords(records, prefix) {
     id: record.id ?? `${prefix}:${index + 1}`,
     evidenceIds: record.evidenceIds ?? []
   }));
+}
+
+function normalizeParadigmRecords(records, prefix) {
+  return (records ?? []).map((record, index) => ({
+    ...record,
+    id: record.id ?? `${prefix}:${index + 1}`,
+    kind: record.kind ?? prefix,
+    evidenceIds: record.evidenceIds ?? [],
+    lossIds: record.lossIds ?? [],
+    effectIds: record.effectIds ?? [],
+    relatedRecordIds: record.relatedRecordIds ?? []
+  }));
+}
+
+function collectParadigmRecordEntries(paradigmSemantics) {
+  if (!paradigmSemantics || typeof paradigmSemantics !== "object") {
+    return [];
+  }
+  return ParadigmSemanticsRecordGroups.flatMap((group) =>
+    (paradigmSemantics[group] ?? []).map((record) => ({ group, record }))
+  );
+}
+
+function collectParadigmRecords(paradigmSemantics) {
+  return collectParadigmRecordEntries(paradigmSemantics).map((entry) => entry.record);
+}
+
+function validateParadigmRecords(records, group, paradigmRecordIds, references, issues) {
+  for (const record of records ?? []) {
+    const label = `Paradigm ${group} record ${record?.id ?? "(unknown)"}`;
+    if (!record?.id) {
+      issues.push(`Paradigm ${group} record is missing id`);
+      continue;
+    }
+    if (!record.kind) {
+      issues.push(`${label} is missing kind`);
+    }
+    validateParadigmSubject(record, label, references, issues);
+    validateReferenceId(record.semanticNodeId, references.semanticNodeIds, "semantic node", label, references, issues);
+    validateReferenceId(record.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", label, references, issues);
+    validateReferenceId(record.semanticOccurrenceId, references.semanticOccurrenceIds, "semantic occurrence", label, references, issues);
+    validateReferenceId(record.nativeSourceId, references.nativeSourceIds, "native source", label, references, issues);
+    validateReferenceId(record.nativeAstId, references.nativeAstIds, "native AST", label, references, issues);
+    validateReferenceId(record.nativeAstNodeId, references.nativeAstNodeIds, "native AST node", label, references, issues);
+    validateReferenceId(record.sourceMapId, references.sourceMapIds, "source map", label, references, issues);
+    validateReferenceId(record.sourceMapMappingId, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+    validateReferenceIds(record.effectIds, references.effectIds, "effect", label, references, issues);
+    validateReferenceIds(record.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+    validateReferenceIds(record.lossIds, references.lossIds, "loss", label, references, issues);
+    validateReferenceIds(record.relatedRecordIds, paradigmRecordIds, "paradigm record", label, references, issues);
+    for (const field of [
+      "bindingScopeId",
+      "parentScopeId",
+      "bindingId",
+      "patternId",
+      "typeConstraintId",
+      "evaluationModelId",
+      "memoryLocationId",
+      "effectRegionId",
+      "controlRegionId",
+      "logicProgramId",
+      "actorSystemId",
+      "stackEffectId",
+      "arrayShapeId",
+      "numericKernelId",
+      "dataflowNetworkId",
+      "clockModelId",
+      "objectModelId",
+      "macroExpansionId",
+      "reflectionBoundaryId",
+      "loweringRecordId",
+      "sourceRecordId",
+      "targetRecordId"
+    ]) {
+      validateReferenceId(record[field], paradigmRecordIds, "paradigm record", label, references, issues);
+    }
+    validateSourceSpan(record.sourceSpan, `${label} source span`, issues);
+    validateSourceSpan(record.generatedSpan, `${label} generated span`, issues);
+  }
 }
 
 function validateProofRecords(records, group, references, issues) {
@@ -2319,6 +2522,53 @@ function inferProofSubjectKind(id, references) {
   return undefined;
 }
 
+function validateParadigmSubject(record, label, references, issues) {
+  if (!record?.subjectId) {
+    return;
+  }
+  const kind = record.subjectKind ?? inferProofSubjectKind(record.subjectId, references);
+  switch (kind) {
+    case "semanticNode":
+      validateReferenceId(record.subjectId, references.semanticNodeIds, "semantic node", label, references, issues);
+      break;
+    case "semanticSymbol":
+      validateReferenceId(record.subjectId, references.semanticSymbolIds, "semantic symbol", label, references, issues);
+      break;
+    case "semanticOccurrence":
+      validateReferenceId(record.subjectId, references.semanticOccurrenceIds, "semantic occurrence", label, references, issues);
+      break;
+    case "semanticRelation":
+      validateReferenceId(record.subjectId, references.semanticRelationIds, "semantic relation", label, references, issues);
+      break;
+    case "semanticFact":
+      validateReferenceId(record.subjectId, references.semanticFactIds, "semantic fact", label, references, issues);
+      break;
+    case "nativeSource":
+      validateReferenceId(record.subjectId, references.nativeSourceIds, "native source", label, references, issues);
+      break;
+    case "nativeAst":
+      validateReferenceId(record.subjectId, references.nativeAstIds, "native AST", label, references, issues);
+      break;
+    case "nativeAstNode":
+      validateReferenceId(record.subjectId, references.nativeAstNodeIds, "native AST node", label, references, issues);
+      break;
+    case "sourceMap":
+      validateReferenceId(record.subjectId, references.sourceMapIds, "source map", label, references, issues);
+      break;
+    case "sourceMapMapping":
+      validateReferenceId(record.subjectId, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+      break;
+    case "effect":
+      validateReferenceId(record.subjectId, references.effectIds, "effect", label, references, issues);
+      break;
+    default:
+      if (references.strict) {
+        issues.push(`${label} references unknown paradigm subject ${record.subjectId}`);
+      }
+      break;
+  }
+}
+
 function collectProofEvidenceIds(proof) {
   if (!proof) return [];
   return unique([
@@ -2331,6 +2581,14 @@ function collectProofEvidenceIds(proof) {
     ...proof.obligations.flatMap((record) => record.evidenceIds ?? []),
     ...proof.artifacts.flatMap((record) => record.evidenceIds ?? []),
     ...proof.assumptions.flatMap((record) => record.evidenceIds ?? [])
+  ].filter(Boolean));
+}
+
+function collectParadigmEvidenceIds(paradigmSemantics) {
+  if (!paradigmSemantics) return [];
+  return unique([
+    ...(paradigmSemantics.evidence ?? []).map((record) => record.id),
+    ...collectParadigmRecords(paradigmSemantics).flatMap((record) => record.evidenceIds ?? [])
   ].filter(Boolean));
 }
 
@@ -2421,6 +2679,9 @@ function validateUniversalAstReference(reference, label, references, issues) {
       break;
     case "proofAssumption":
       validateReferenceId(reference.id, references.proofAssumptionIds, "proof assumption", label, references, issues);
+      break;
+    case "paradigmRecord":
+      validateReferenceId(reference.id, references.paradigmRecordIds, "paradigm record", label, references, issues);
       break;
     case "loss":
       validateReferenceId(reference.id, references.lossIds, "loss", label, references, issues);

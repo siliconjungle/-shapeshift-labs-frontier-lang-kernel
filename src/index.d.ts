@@ -273,6 +273,7 @@ export type UniversalAstLayerName =
   | "controlFlow"
   | "dataFlow"
   | "proofSpec"
+  | "paradigmSemantics"
   | "runtimeModel"
   | "projectionEvidence"
   | "mergeEvidence"
@@ -297,6 +298,7 @@ export type UniversalAstReferenceKind =
   | "proofObligation"
   | "proofArtifact"
   | "proofAssumption"
+  | "paradigmRecord"
   | "loss"
   | "evidence"
   | "effect"
@@ -322,6 +324,28 @@ export declare const ProofObligationStatuses: readonly ProofObligationStatus[];
 export type ProofArtifactKind = "solverRun" | "proofScript" | "modelCheck" | "counterexample" | "certificate" | "manualReview" | "testEvidence" | string;
 export declare const ProofArtifactKinds: readonly ProofArtifactKind[];
 
+export type ParadigmSemanticsRecordGroup =
+  | "bindingScopes"
+  | "bindings"
+  | "patterns"
+  | "typeConstraints"
+  | "evaluationModels"
+  | "memoryLocations"
+  | "effectRegions"
+  | "controlRegions"
+  | "logicPrograms"
+  | "actorSystems"
+  | "stackEffects"
+  | "arrayShapes"
+  | "numericKernels"
+  | "dataflowNetworks"
+  | "clockModels"
+  | "objectModels"
+  | "macroExpansions"
+  | "reflectionBoundaries"
+  | "loweringRecords";
+export declare const ParadigmSemanticsRecordGroups: readonly ParadigmSemanticsRecordGroup[];
+
 export type ProofSubjectKind =
   | "semanticNode"
   | "semanticSymbol"
@@ -332,6 +356,12 @@ export type ProofSubjectKind =
   | "sourceMap"
   | "sourceMapMapping"
   | "effect"
+  | string;
+
+export type ParadigmSemanticSubjectKind =
+  | ProofSubjectKind
+  | "semanticRelation"
+  | "semanticFact"
   | string;
 
 export interface SourceMapGeneratedSpan extends SourceSpan {
@@ -591,6 +621,83 @@ export interface ProofSpecLayerInput {
   readonly metadata?: JsonObject;
 }
 
+export interface ParadigmSemanticRecord {
+  readonly id: string;
+  readonly kind: string;
+  readonly subjectKind?: ParadigmSemanticSubjectKind;
+  readonly subjectId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstId?: string;
+  readonly nativeAstNodeId?: string;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly sourceSpan?: SourceSpan;
+  readonly generatedSpan?: SourceMapGeneratedSpan;
+  readonly effectIds?: readonly string[];
+  readonly evidenceIds?: readonly string[];
+  readonly lossIds?: readonly string[];
+  readonly relatedRecordIds?: readonly string[];
+  readonly bindingScopeId?: string;
+  readonly parentScopeId?: string;
+  readonly bindingId?: string;
+  readonly patternId?: string;
+  readonly typeConstraintId?: string;
+  readonly evaluationModelId?: string;
+  readonly memoryLocationId?: string;
+  readonly effectRegionId?: string;
+  readonly controlRegionId?: string;
+  readonly logicProgramId?: string;
+  readonly actorSystemId?: string;
+  readonly stackEffectId?: string;
+  readonly arrayShapeId?: string;
+  readonly numericKernelId?: string;
+  readonly dataflowNetworkId?: string;
+  readonly clockModelId?: string;
+  readonly objectModelId?: string;
+  readonly macroExpansionId?: string;
+  readonly reflectionBoundaryId?: string;
+  readonly loweringRecordId?: string;
+  readonly sourceRecordId?: string;
+  readonly targetRecordId?: string;
+  readonly [key: string]: JsonValue | SourceSpan | SourceMapGeneratedSpan | readonly string[] | undefined;
+}
+
+export interface FrontierParadigmSemanticsLayer {
+  readonly kind: "frontier.lang.paradigmSemantics";
+  readonly version: 1;
+  readonly id: string;
+  readonly bindingScopes: readonly ParadigmSemanticRecord[];
+  readonly bindings: readonly ParadigmSemanticRecord[];
+  readonly patterns: readonly ParadigmSemanticRecord[];
+  readonly typeConstraints: readonly ParadigmSemanticRecord[];
+  readonly evaluationModels: readonly ParadigmSemanticRecord[];
+  readonly memoryLocations: readonly ParadigmSemanticRecord[];
+  readonly effectRegions: readonly ParadigmSemanticRecord[];
+  readonly controlRegions: readonly ParadigmSemanticRecord[];
+  readonly logicPrograms: readonly ParadigmSemanticRecord[];
+  readonly actorSystems: readonly ParadigmSemanticRecord[];
+  readonly stackEffects: readonly ParadigmSemanticRecord[];
+  readonly arrayShapes: readonly ParadigmSemanticRecord[];
+  readonly numericKernels: readonly ParadigmSemanticRecord[];
+  readonly dataflowNetworks: readonly ParadigmSemanticRecord[];
+  readonly clockModels: readonly ParadigmSemanticRecord[];
+  readonly objectModels: readonly ParadigmSemanticRecord[];
+  readonly macroExpansions: readonly ParadigmSemanticRecord[];
+  readonly reflectionBoundaries: readonly ParadigmSemanticRecord[];
+  readonly loweringRecords: readonly ParadigmSemanticRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
+export type ParadigmSemanticsLayerInput = {
+  readonly id?: string;
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+} & Partial<Record<ParadigmSemanticsRecordGroup, readonly ParadigmSemanticRecord[]>>;
+
 export interface UniversalAstLayerRecord {
   readonly kind: "frontier.lang.universalAstLayer";
   readonly version: 1;
@@ -608,6 +715,7 @@ export interface UniversalAstLayerRecord {
   readonly sourceMapIds?: readonly string[];
   readonly sourceMapMappingIds?: readonly string[];
   readonly mergeCandidateIds?: readonly string[];
+  readonly paradigmRecordIds?: readonly string[];
   readonly lossIds?: readonly string[];
   readonly evidenceIds: readonly string[];
   readonly effectIds?: readonly string[];
@@ -634,6 +742,7 @@ export interface FrontierUniversalAstEnvelope {
   readonly evidence: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly proof?: FrontierProofSpecLayer;
+  readonly paradigmSemantics?: FrontierParadigmSemanticsLayer;
   readonly layers?: UniversalAstLayerMap;
   readonly metadata?: JsonObject;
 }
@@ -1065,6 +1174,7 @@ export declare function validateSourceMapRecord(sourceMap: SourceMapRecord, cont
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
+  readonly paradigmSemantics?: FrontierParadigmSemanticsLayer;
 }): readonly string[];
 export declare function createUniversalAstLayer(input: Omit<UniversalAstLayerRecord, "kind" | "version" | "id" | "references" | "records" | "evidenceIds"> & {
   readonly id?: string;
@@ -1086,6 +1196,20 @@ export declare function validateProofSpecLayer(proof: FrontierProofSpecLayer, co
   readonly proof?: FrontierProofSpecLayer;
   readonly strict?: boolean;
 }): readonly string[];
+export declare function createParadigmSemanticsLayer(input?: ParadigmSemanticsLayerInput | FrontierParadigmSemanticsLayer): FrontierParadigmSemanticsLayer;
+export declare function validateParadigmSemanticsLayer(paradigmSemantics: FrontierParadigmSemanticsLayer, context?: {
+  readonly envelope?: FrontierUniversalAstEnvelope;
+  readonly document?: FrontierLangDocument;
+  readonly nativeSources?: readonly NativeSourceNode[];
+  readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps?: readonly SourceMapRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly paradigmSemantics?: FrontierParadigmSemanticsLayer;
+  readonly strict?: boolean;
+}): readonly string[];
 export declare function validateUniversalAstLayer(layer: UniversalAstLayerRecord, context?: {
   readonly envelope?: FrontierUniversalAstEnvelope;
   readonly document?: FrontierLangDocument;
@@ -1096,10 +1220,11 @@ export declare function validateUniversalAstLayer(layer: UniversalAstLayerRecord
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
+  readonly paradigmSemantics?: FrontierParadigmSemanticsLayer;
   readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
   readonly strict?: boolean;
 }): readonly string[];
-export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence" | "mergeCandidates" | "proof" | "layers"> & {
+export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence" | "mergeCandidates" | "proof" | "paradigmSemantics" | "layers"> & {
   readonly schema?: FrontierUniversalAstEnvelope["schema"];
   readonly nativeSources?: readonly NativeSourceNode[];
   readonly sourceMaps?: readonly SourceMapRecord[];
@@ -1107,6 +1232,7 @@ export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversal
   readonly evidence?: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
   readonly proof?: ProofSpecLayerInput | FrontierProofSpecLayer;
+  readonly paradigmSemantics?: ParadigmSemanticsLayerInput | FrontierParadigmSemanticsLayer;
   readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
 }): FrontierUniversalAstEnvelope;
 export declare function validateUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): readonly string[];

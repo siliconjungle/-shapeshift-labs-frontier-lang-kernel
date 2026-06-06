@@ -8,6 +8,7 @@ import {
   createNativeAstRecord,
   createNativeAstMergeCandidate,
   createPatch,
+  createParadigmSemanticsLayer,
   createSemanticIndexRecord,
   createSemanticMergeCandidateRecord,
   createSemanticMergeCandidateFromImport,
@@ -25,6 +26,7 @@ import {
   latticeNode,
   nativeSourceNode,
   NativeAstLossKinds,
+  ParadigmSemanticsRecordGroups,
   ProofArtifactKinds,
   ProofObligationStatuses,
   ProofSpecContractKinds,
@@ -34,7 +36,9 @@ import {
   stableUniversalAstJson,
   typeNode,
   UniversalAstLayerNames,
+  UniversalAstReferenceKinds,
   validateDocument,
+  validateParadigmSemanticsLayer,
   validateSemanticIndexRecord,
   validateSourceMapRecord,
   validateProofSpecLayer,
@@ -47,9 +51,12 @@ assert.equal(SourceMapPrecisions.includes('declaration'), true);
 assert.equal(SourcePreservationLevels.includes('blocked'), true);
 assert.equal(UniversalAstLayerNames.includes('runtimeModel'), true);
 assert.equal(UniversalAstLayerNames.includes('proofSpec'), true);
+assert.equal(UniversalAstLayerNames.includes('paradigmSemantics'), true);
+assert.equal(UniversalAstReferenceKinds.includes('paradigmRecord'), true);
 assert.equal(ProofSpecContractKinds.includes('precondition'), true);
 assert.equal(ProofObligationStatuses.includes('discharged'), true);
 assert.equal(ProofArtifactKinds.includes('solverRun'), true);
+assert.equal(ParadigmSemanticsRecordGroups.includes('stackEffects'), true);
 
 const tagSet = latticeNode({
   id: 'lat_tag_set',
@@ -462,6 +469,170 @@ assert.deepEqual(validateProofSpecLayer(proofSpec, {
   sourceMaps: [sourceMap],
   evidence: [...semanticIndex.evidence, proofEvidence]
 }), []);
+const paradigmEvidence = {
+  id: 'paradigm_import_review',
+  kind: 'import',
+  status: 'passed',
+  summary: 'Imported mixed-paradigm semantic facets for lexical, logic, stack, array, and lowering records.'
+};
+const paradigmSemantics = createParadigmSemanticsLayer({
+  id: 'paradigm_todo',
+  bindingScopes: [{
+    id: 'scope_todo_entity',
+    kind: 'lexicalScope',
+    scopeKind: 'entity',
+    semanticNodeId: 'ent_todo',
+    nativeSourceId: 'native_source_todo',
+    nativeAstId: 'native_ts_todo',
+    nativeAstNodeId: 'native_todo_interface',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  bindings: [{
+    id: 'binding_todo_title',
+    kind: 'fieldBinding',
+    name: 'title',
+    bindingScopeId: 'scope_todo_entity',
+    subjectKind: 'semanticSymbol',
+    subjectId: 'symbol:Todo',
+    semanticNodeId: 'ent_todo',
+    semanticSymbolId: 'symbol:Todo',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  patterns: [{
+    id: 'pattern_todo_record',
+    kind: 'recordPattern',
+    bindingId: 'binding_todo_title',
+    shape: { fields: ['title', 'tags'] },
+    evidenceIds: ['paradigm_import_review']
+  }],
+  typeConstraints: [{
+    id: 'type_title_text',
+    kind: 'structuralConstraint',
+    bindingId: 'binding_todo_title',
+    expression: 'title: Text',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  evaluationModels: [{
+    id: 'eval_save_eager',
+    kind: 'eagerEvaluation',
+    semanticNodeId: 'extern_save_todo',
+    strategy: 'callByValue',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  memoryLocations: [{
+    id: 'memory_todo_heap',
+    kind: 'heapObject',
+    evaluationModelId: 'eval_save_eager',
+    storage: 'managed',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  effectRegions: [{
+    id: 'effect_http_region',
+    kind: 'asyncEffectRegion',
+    semanticNodeId: 'effect_fetch_todo',
+    effectIds: ['http.request'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  controlRegions: [{
+    id: 'control_save_linear',
+    kind: 'sequentialControl',
+    semanticNodeId: 'extern_save_todo',
+    evaluationModelId: 'eval_save_eager',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  logicPrograms: [{
+    id: 'logic_todo_valid',
+    kind: 'hornClause',
+    predicate: 'valid_todo(Title) :- non_empty(Title)',
+    subjectKind: 'semanticNode',
+    subjectId: 'ent_todo',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  actorSystems: [{
+    id: 'actor_todo_worker',
+    kind: 'mailboxActor',
+    mailbox: 'todo.updates',
+    effectRegionId: 'effect_http_region',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  stackEffects: [{
+    id: 'stack_validate_title',
+    kind: 'concatenativeStackEffect',
+    inputs: ['title'],
+    outputs: ['valid?'],
+    relatedRecordIds: ['logic_todo_valid'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  arrayShapes: [{
+    id: 'array_tags_rank1',
+    kind: 'rankedArray',
+    semanticNodeId: 'ent_todo',
+    rank: 1,
+    elementType: 'Text',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  numericKernels: [{
+    id: 'kernel_tag_count',
+    kind: 'elementalKernel',
+    arrayShapeId: 'array_tags_rank1',
+    operation: 'count(tags)',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  dataflowNetworks: [{
+    id: 'dataflow_todo_pipeline',
+    kind: 'demandDataflow',
+    relatedRecordIds: ['kernel_tag_count', 'effect_http_region'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  clockModels: [{
+    id: 'clock_runtime_tick',
+    kind: 'eventLoopClock',
+    effectRegionId: 'effect_http_region',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  objectModels: [{
+    id: 'object_todo_structural',
+    kind: 'structuralObject',
+    semanticNodeId: 'ent_todo',
+    memoryLocationId: 'memory_todo_heap',
+    evidenceIds: ['paradigm_import_review']
+  }],
+  macroExpansions: [{
+    id: 'macro_todo_generated',
+    kind: 'decoratorExpansion',
+    sourceMapId: 'sourcemap_todo_ts',
+    sourceMapMappingId: 'sourcemap_todo_ts:map_todo_interface',
+    lossIds: ['loss_decorator'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  reflectionBoundaries: [{
+    id: 'reflection_fetch_adapter',
+    kind: 'foreignRuntimeBoundary',
+    effectIds: ['http.request'],
+    relatedRecordIds: ['effect_http_region'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  loweringRecords: [{
+    id: 'lower_ts_to_frontier_todo',
+    kind: 'nativeToFrontier',
+    sourceRecordId: 'macro_todo_generated',
+    targetRecordId: 'object_todo_structural',
+    sourceMapId: 'sourcemap_todo_ts',
+    sourceMapMappingId: 'sourcemap_todo_ts:map_todo_interface',
+    lossIds: ['loss_decorator'],
+    evidenceIds: ['paradigm_import_review']
+  }],
+  evidence: [paradigmEvidence]
+});
+assert.deepEqual(validateParadigmSemanticsLayer(paradigmSemantics, {
+  document,
+  nativeSources: [nativeTodo],
+  nativeAst,
+  semanticIndex,
+  sourceMaps: [sourceMap],
+  losses: nativeAst.losses,
+  evidence: [...semanticIndex.evidence, ...sourceMap.evidence, paradigmEvidence]
+}), []);
 const projectionMergeCandidate = createSemanticMergeCandidateRecord({
   id: 'merge_projection_todo',
   touchedSymbols: [{
@@ -597,8 +768,9 @@ const universalAst = createUniversalAstEnvelope({
   sourceMaps: [sourceMap],
   mergeCandidates: [projectionMergeCandidate],
   proof: proofSpec,
+  paradigmSemantics,
   layers: universalAstLayers,
-  evidence: [...semanticIndex.evidence, runtimeEvidence, projectionMergeEvidence, proofEvidence]
+  evidence: [...semanticIndex.evidence, runtimeEvidence, projectionMergeEvidence, proofEvidence, paradigmEvidence]
 });
 assert.deepEqual(validateUniversalAstEnvelope(universalAst), []);
 assert.equal(universalAst.nativeSources[0].id, 'native_source_todo');
@@ -614,9 +786,13 @@ assert.equal(universalAst.layers.runtimeModel.runtime.entrypoints[0].effectIds[0
 assert.equal(universalAst.layers.projectionEvidence.sourceMapIds[0], 'sourcemap_todo_ts');
 assert.equal(universalAst.layers.mergeEvidence.mergeCandidateIds[0], 'merge_projection_todo');
 assert.equal(universalAst.proof.contracts[0].id, 'contract_todo_title_pre');
+assert.equal(universalAst.paradigmSemantics.stackEffects[0].id, 'stack_validate_title');
 assert.equal(universalAst.layers.proofSpec.references.some((reference) => reference.kind === 'proofObligation' && reference.id === 'obligation_todo_title'), true);
+assert.equal(universalAst.layers.paradigmSemantics.records[0].stackEffects, 1);
+assert.equal(universalAst.layers.paradigmSemantics.references.some((reference) => reference.kind === 'paradigmRecord' && reference.id === 'lower_ts_to_frontier_todo'), true);
 assert.deepEqual(validateUniversalAstLayer(universalAst.layers.controlFlow, { envelope: universalAst }), []);
 assert.deepEqual(validateUniversalAstLayer(universalAst.layers.proofSpec, { envelope: universalAst }), []);
+assert.deepEqual(validateUniversalAstLayer(universalAst.layers.paradigmSemantics, { envelope: universalAst }), []);
 assert.match(stableUniversalAstJson(universalAst), /frontier\.lang\.universalAst/);
 assert.match(hashUniversalAstEnvelope(universalAst), /^fnv1a32:/);
 const partialUniversalAst = createUniversalAstEnvelope({
@@ -672,6 +848,25 @@ const brokenProofEnvelope = createUniversalAstEnvelope({
   })
 });
 assert.match(validateUniversalAstEnvelope(brokenProofEnvelope).join('\n'), /missing semantic node missing_node/);
+const brokenParadigmEnvelope = createUniversalAstEnvelope({
+  id: 'uast_broken_paradigm',
+  document,
+  semanticIndex,
+  paradigmSemantics: createParadigmSemanticsLayer({
+    bindings: [{
+      id: 'binding_missing_links',
+      kind: 'fieldBinding',
+      subjectKind: 'semanticNode',
+      subjectId: 'missing_node',
+      bindingScopeId: 'missing_scope',
+      evidenceIds: ['missing_paradigm_evidence']
+    }]
+  })
+});
+const brokenParadigmIssues = validateUniversalAstEnvelope(brokenParadigmEnvelope).join('\n');
+assert.match(brokenParadigmIssues, /missing semantic node missing_node/);
+assert.match(brokenParadigmIssues, /missing paradigm record missing_scope/);
+assert.match(brokenParadigmIssues, /missing evidence missing_paradigm_evidence/);
 const baseHash = hashDocumentBase(document);
 const nativeImportPatch = createPatch({
   id: 'native-import-todo',

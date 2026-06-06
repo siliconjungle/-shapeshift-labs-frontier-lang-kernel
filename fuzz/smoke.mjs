@@ -6,6 +6,7 @@ import {
   createNativeAstMergeCandidate,
   createNativeAstRecord,
   createPatch,
+  createParadigmSemanticsLayer,
   createProofSpecLayer,
   createSemanticIndexRecord,
   createSourceMapRecord,
@@ -15,6 +16,7 @@ import {
   latticeNode,
   replayDocument,
   validateDocument,
+  validateParadigmSemanticsLayer,
   validateProofSpecLayer,
   validateUniversalAstEnvelope
 } from '../dist/index.js';
@@ -86,13 +88,24 @@ for (let index = 0; index < 100; index += 1) {
     evidence: [proofEvidence]
   });
   assert.deepEqual(validateProofSpecLayer(proof, { document, semanticIndex, sourceMaps: [sourceMap], evidence: [proofEvidence] }), []);
+  const paradigmEvidence = { id: `paradigm_${index}`, kind: 'import', status: 'passed' };
+  const paradigmSemantics = createParadigmSemanticsLayer({
+    id: `paradigm_spec_${index}`,
+    bindingScopes: [{ id: `scope_${index}`, kind: 'lexicalScope', semanticNodeId: entity.id, evidenceIds: [paradigmEvidence.id] }],
+    bindings: [{ id: `binding_${index}`, kind: 'fieldBinding', bindingScopeId: `scope_${index}`, semanticNodeId: entity.id, semanticSymbolId: `symbol_${index}`, evidenceIds: [paradigmEvidence.id] }],
+    typeConstraints: [{ id: `type_constraint_${index}`, kind: 'mergeLawConstraint', bindingId: `binding_${index}`, expression: 'field merge policy is explicit', evidenceIds: [paradigmEvidence.id] }],
+    loweringRecords: [{ id: `lowering_${index}`, kind: 'nativeToFrontier', sourceRecordId: `binding_${index}`, targetRecordId: `type_constraint_${index}`, evidenceIds: [paradigmEvidence.id] }],
+    evidence: [paradigmEvidence]
+  });
+  assert.deepEqual(validateParadigmSemanticsLayer(paradigmSemantics, { document, semanticIndex, sourceMaps: [sourceMap], evidence: [paradigmEvidence] }), []);
   assert.deepEqual(validateUniversalAstEnvelope(createUniversalAstEnvelope({
     id: `uast_${index}`,
     document,
     semanticIndex,
     sourceMaps: [sourceMap],
     proof,
-    evidence: [proofEvidence]
+    paradigmSemantics,
+    evidence: [proofEvidence, paradigmEvidence]
   })), []);
   const candidate = createNativeAstMergeCandidate({
     document,

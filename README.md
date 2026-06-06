@@ -266,6 +266,25 @@ const envelope = createUniversalAstEnvelope({ id: 'uast_todo', document, proof }
 console.log(envelope.layers.proofSpec.records[0]); // contract/obligation/artifact/assumption counts
 ```
 
+## Paradigm Semantics Layer
+
+Source imports can preserve paradigm-specific facts as structured records instead of flattening everything into one language model:
+
+```js
+import { createParadigmSemanticsLayer, createUniversalAstEnvelope } from '@shapeshift-labs/frontier-lang-kernel';
+
+const paradigmSemantics = createParadigmSemanticsLayer({
+  logicPrograms: [{ id: 'valid_todo_clause', kind: 'hornClause', predicate: 'valid_todo(T) :- non_empty(T)' }],
+  stackEffects: [{ id: 'validate_title_stack', kind: 'concatenativeStackEffect', inputs: ['title'], outputs: ['valid?'] }],
+  arrayShapes: [{ id: 'tags_rank1', kind: 'rankedArray', rank: 1, elementType: 'Text' }],
+  numericKernels: [{ id: 'count_tags_kernel', kind: 'elementalKernel', arrayShapeId: 'tags_rank1', operation: 'count(tags)' }],
+  loweringRecords: [{ id: 'lower_logic_to_js', kind: 'frontierToTarget', sourceRecordId: 'valid_todo_clause' }]
+});
+
+const envelope = createUniversalAstEnvelope({ id: 'uast_todo', document, paradigmSemantics });
+console.log(envelope.layers.paradigmSemantics.records[0]); // per-group semantic facet counts
+```
+
 ## Package Boundary
 
 - Parser: `@shapeshift-labs/frontier-lang-parser`
