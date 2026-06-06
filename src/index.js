@@ -36,6 +36,37 @@ export const SourcePreservationLevels = Object.freeze([
   "blocked"
 ]);
 
+export const UniversalAstLayerNames = Object.freeze([
+  "losslessSource",
+  "cst",
+  "semanticSymbols",
+  "effects",
+  "controlFlow",
+  "dataFlow",
+  "runtimeModel",
+  "projectionEvidence",
+  "mergeEvidence"
+]);
+
+export const UniversalAstReferenceKinds = Object.freeze([
+  "layer",
+  "nativeSource",
+  "nativeAst",
+  "nativeAstNode",
+  "semanticNode",
+  "semanticIndex",
+  "semanticSymbol",
+  "semanticOccurrence",
+  "semanticRelation",
+  "semanticFact",
+  "sourceMap",
+  "sourceMapMapping",
+  "mergeCandidate",
+  "loss",
+  "evidence",
+  "effect"
+]);
+
 export function moduleNode(input) {
   return { ...input, kind: "module" };
 }
@@ -127,6 +158,18 @@ export function createSourcePreservationRecord(input) {
     lossIds: input.lossIds ?? input.losses?.map((record) => record.id) ?? [],
     evidenceIds: input.evidenceIds ?? input.evidence?.map((record) => record.id) ?? [],
     reasons: input.reasons ?? []
+  };
+}
+
+export function createUniversalAstLayer(input) {
+  return {
+    ...input,
+    kind: "frontier.lang.universalAstLayer",
+    version: 1,
+    id: input.id ?? `layer:${input.layer ?? "unknown"}`,
+    references: input.references ?? [],
+    records: input.records ?? [],
+    evidenceIds: input.evidenceIds ?? []
   };
 }
 
@@ -309,6 +352,71 @@ export function validateSourceMapRecord(sourceMap, context = {}) {
   return issues;
 }
 
+export function validateUniversalAstLayer(layer, context = {}) {
+  const issues = [];
+  if (!layer || typeof layer !== "object") {
+    return ["Universal AST layer is not an object"];
+  }
+
+  const label = `Universal AST layer ${layer.id ?? "(unknown)"}`;
+  const references = createUniversalAstReferenceIndex(context);
+  if (layer.kind !== "frontier.lang.universalAstLayer") {
+    issues.push(`${label} has invalid kind`);
+  }
+  if (layer.version !== 1) {
+    issues.push(`${label} has unsupported version ${layer.version}`);
+  }
+  if (!layer.id) {
+    issues.push("Universal AST layer is missing id");
+  }
+  if (!layer.layer) {
+    issues.push(`${label} is missing layer name`);
+  }
+
+  validateReferenceIds(layer.nativeSourceIds, references.nativeSourceIds, "native source", label, references, issues);
+  validateReferenceIds(layer.nativeAstIds, references.nativeAstIds, "native AST", label, references, issues);
+  validateReferenceIds(layer.nativeAstNodeIds, references.nativeAstNodeIds, "native AST node", label, references, issues);
+  validateReferenceIds(layer.semanticNodeIds, references.semanticNodeIds, "semantic node", label, references, issues);
+  validateReferenceIds(layer.semanticSymbolIds, references.semanticSymbolIds, "semantic symbol", label, references, issues);
+  validateReferenceIds(layer.semanticOccurrenceIds, references.semanticOccurrenceIds, "semantic occurrence", label, references, issues);
+  validateReferenceIds(layer.semanticRelationIds, references.semanticRelationIds, "semantic relation", label, references, issues);
+  validateReferenceIds(layer.semanticFactIds, references.semanticFactIds, "semantic fact", label, references, issues);
+  validateReferenceIds(layer.sourceMapIds, references.sourceMapIds, "source map", label, references, issues);
+  validateReferenceIds(layer.sourceMapMappingIds, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+  validateReferenceIds(layer.mergeCandidateIds, references.mergeCandidateIds, "merge candidate", label, references, issues);
+  validateReferenceIds(layer.lossIds, references.lossIds, "loss", label, references, issues);
+  validateReferenceIds(layer.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+  validateReferenceIds(layer.effectIds, references.effectIds, "effect", label, references, issues);
+
+  if (layer.semanticIndexId) {
+    validateReferenceId(layer.semanticIndexId, references.semanticIndexIds, "semantic index", label, references, issues);
+  }
+
+  for (const reference of layer.references ?? []) {
+    validateUniversalAstReference(reference, label, references, issues);
+  }
+
+  for (const artifact of layer.artifacts ?? []) {
+    const artifactLabel = `${label} artifact ${artifact?.id ?? "(unknown)"}`;
+    if (!artifact?.id) {
+      issues.push(`${label} has artifact without id`);
+      continue;
+    }
+    validateReferenceId(artifact.nativeSourceId, references.nativeSourceIds, "native source", artifactLabel, references, issues);
+    validateReferenceId(artifact.nativeAstId, references.nativeAstIds, "native AST", artifactLabel, references, issues);
+    validateReferenceId(artifact.nativeAstNodeId, references.nativeAstNodeIds, "native AST node", artifactLabel, references, issues);
+    validateReferenceId(artifact.semanticNodeId, references.semanticNodeIds, "semantic node", artifactLabel, references, issues);
+    validateReferenceId(artifact.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", artifactLabel, references, issues);
+    validateReferenceId(artifact.sourceMapId, references.sourceMapIds, "source map", artifactLabel, references, issues);
+    validateReferenceId(artifact.evidenceId, references.evidenceIds, "evidence", artifactLabel, references, issues);
+  }
+
+  validateUniversalAstGraph(layer.graph, label, references, issues);
+  validateUniversalAstRuntime(layer.runtime, label, references, issues);
+
+  return issues;
+}
+
 export function validateSemanticIndexRecord(index) {
   const issues = [];
   if (index.kind !== "frontier.lang.semanticIndex") {
@@ -377,15 +485,27 @@ export function validateSemanticIndexRecord(index) {
 export function createUniversalAstEnvelope(input) {
   const nativeSources = input.nativeSources ?? Object.values(input.document.nodes).filter((node) => node.kind === "nativeSource");
   const losses = input.losses ?? nativeSources.flatMap((source) => source.losses ?? source.ast?.losses ?? []);
+  const sourceMaps = input.sourceMaps ?? [];
+  const evidence = input.evidence ?? [];
+  const mergeCandidates = input.mergeCandidates ?? [];
   return {
     ...input,
     kind: "frontier.lang.universalAst",
     version: 1,
     schema: input.schema ?? "frontier.lang.semantic.v1",
     nativeSources,
-    sourceMaps: input.sourceMaps ?? [],
+    sourceMaps,
     losses,
-    evidence: input.evidence ?? []
+    evidence,
+    mergeCandidates,
+    layers: normalizeUniversalAstLayers(input.layers, createDefaultUniversalAstLayers({
+      nativeSources,
+      semanticIndex: input.semanticIndex,
+      sourceMaps,
+      losses,
+      evidence,
+      mergeCandidates
+    }))
   };
 }
 
@@ -424,9 +544,16 @@ export function validateUniversalAstEnvelope(envelope) {
       nativeSources: envelope.nativeSources,
       semanticIndex: envelope.semanticIndex,
       sourceMaps: envelope.sourceMaps,
+      mergeCandidates: envelope.mergeCandidates,
       losses: envelope.losses,
       evidence: envelope.evidence
     }).map((issue) => `sourceMap: ${issue}`));
+  }
+  if (envelope.layers && typeof envelope.layers !== "object") {
+    issues.push(`Universal AST envelope ${envelope.id ?? "(unknown)"} layers must be an object or array`);
+  }
+  for (const layer of collectUniversalAstLayerRecords(envelope.layers)) {
+    issues.push(...validateUniversalAstLayer(layer, { envelope }).map((issue) => `layer: ${issue}`));
   }
   return issues;
 }
@@ -1719,6 +1846,365 @@ function collectNativeAstNodeIds(nativeAst, nativeSources) {
     ...Object.keys(nativeAst?.nodes ?? {}),
     ...(nativeSources ?? []).flatMap((source) => Object.keys(source.ast?.nodes ?? {}))
   ]);
+}
+
+function createDefaultUniversalAstLayers(input) {
+  const layers = {};
+  const nativeSourceIds = input.nativeSources.map((source) => source.id);
+  const nativeAstIds = unique(input.nativeSources.map((source) => source.ast?.id).filter(Boolean));
+  const nativeAstNodeIds = unique(input.nativeSources.flatMap((source) => Object.keys(source.ast?.nodes ?? {})));
+  const lossIds = input.losses.map((loss) => loss.id).filter(Boolean);
+
+  if (nativeSourceIds.length > 0 || lossIds.length > 0) {
+    layers.losslessSource = createUniversalAstLayer({
+      id: "layer:losslessSource",
+      layer: "losslessSource",
+      nativeSourceIds,
+      nativeAstIds,
+      lossIds
+    });
+  }
+
+  if (nativeAstIds.length > 0 || nativeAstNodeIds.length > 0) {
+    layers.cst = createUniversalAstLayer({
+      id: "layer:cst",
+      layer: "cst",
+      nativeSourceIds,
+      nativeAstIds,
+      nativeAstNodeIds
+    });
+  }
+
+  if (input.semanticIndex) {
+    layers.semanticSymbols = createUniversalAstLayer({
+      id: "layer:semanticSymbols",
+      layer: "semanticSymbols",
+      semanticIndexId: input.semanticIndex.id,
+      semanticSymbolIds: (input.semanticIndex.symbols ?? []).map((symbol) => symbol.id),
+      semanticOccurrenceIds: (input.semanticIndex.occurrences ?? []).map((occurrence) => occurrence.id),
+      semanticRelationIds: (input.semanticIndex.relations ?? []).map((relation) => relation.id),
+      semanticFactIds: (input.semanticIndex.facts ?? []).map((fact) => fact.id),
+      evidenceIds: (input.semanticIndex.evidence ?? []).map((record) => record.id)
+    });
+  }
+
+  if (input.sourceMaps.length > 0) {
+    layers.projectionEvidence = createUniversalAstLayer({
+      id: "layer:projectionEvidence",
+      layer: "projectionEvidence",
+      sourceMapIds: input.sourceMaps.map((sourceMap) => sourceMap.id),
+      sourceMapMappingIds: input.sourceMaps.flatMap((sourceMap) =>
+        (sourceMap.mappings ?? []).map((mapping) => `${sourceMap.id}:${mapping.id}`)
+      ),
+      evidenceIds: input.sourceMaps.flatMap((sourceMap) => (sourceMap.evidence ?? []).map((record) => record.id))
+    });
+  }
+
+  if (input.mergeCandidates.length > 0 || input.evidence.length > 0) {
+    layers.mergeEvidence = createUniversalAstLayer({
+      id: "layer:mergeEvidence",
+      layer: "mergeEvidence",
+      mergeCandidateIds: input.mergeCandidates.map((candidate) => candidate.id),
+      evidenceIds: unique([
+        ...input.evidence.map((record) => record.id),
+        ...input.mergeCandidates.flatMap((candidate) => (candidate.evidence ?? []).map((record) => record.id))
+      ].filter(Boolean))
+    });
+  }
+
+  return layers;
+}
+
+function normalizeUniversalAstLayers(input, defaults = {}) {
+  const normalized = { ...defaults };
+  if (!input) {
+    return normalized;
+  }
+
+  const entries = Array.isArray(input) ? input.map((layer) => [layer?.layer ?? layer?.id, layer]) : Object.entries(input);
+  for (const [key, value] of entries) {
+    const records = Array.isArray(value) ? value : [value];
+    for (const record of records) {
+      if (!record || typeof record !== "object") {
+        continue;
+      }
+      const layer = record.layer ?? key;
+      normalized[layer] = createUniversalAstLayer({
+        ...record,
+        id: record.id ?? `layer:${layer}`,
+        layer
+      });
+    }
+  }
+  return normalized;
+}
+
+function collectUniversalAstLayerRecords(layers) {
+  if (!layers) {
+    return [];
+  }
+  if (Array.isArray(layers)) {
+    return layers;
+  }
+  if (typeof layers !== "object") {
+    return [];
+  }
+  return Object.values(layers).flatMap((value) => Array.isArray(value) ? value : [value]);
+}
+
+function createUniversalAstReferenceIndex(context = {}) {
+  const envelope = context.envelope;
+  const document = context.document ?? envelope?.document;
+  const nativeSources = uniqueById([
+    ...(context.nativeSources ?? []),
+    ...(envelope?.nativeSources ?? []),
+    ...Object.values(document?.nodes ?? {}).filter((node) => node.kind === "nativeSource")
+  ]);
+  const semanticIndex = context.semanticIndex ?? envelope?.semanticIndex;
+  const sourceMaps = context.sourceMaps ?? envelope?.sourceMaps ?? [];
+  const mergeCandidates = context.mergeCandidates ?? envelope?.mergeCandidates ?? [];
+  const layers = collectUniversalAstLayerRecords(context.layers ?? envelope?.layers);
+  const nativeAsts = uniqueById([
+    context.nativeAst,
+    ...nativeSources.map((source) => source.ast)
+  ].filter(Boolean));
+  const sourceMapMappingIds = [];
+  for (const sourceMap of sourceMaps) {
+    for (const mapping of sourceMap.mappings ?? []) {
+      if (!mapping?.id) continue;
+      sourceMapMappingIds.push(mapping.id);
+      sourceMapMappingIds.push(`${sourceMap.id}:${mapping.id}`);
+    }
+  }
+
+  const evidence = [
+    ...(context.evidence ?? []),
+    ...(envelope?.evidence ?? []),
+    ...(semanticIndex?.evidence ?? []),
+    ...sourceMaps.flatMap((sourceMap) => sourceMap.evidence ?? []),
+    ...mergeCandidates.flatMap((candidate) => candidate.evidence ?? [])
+  ];
+  const losses = [
+    ...(context.losses ?? []),
+    ...(envelope?.losses ?? []),
+    ...nativeSources.flatMap((source) => source.losses ?? []),
+    ...nativeAsts.flatMap((nativeAst) => nativeAst.losses ?? [])
+  ];
+
+  return {
+    strict: Boolean(context.strict ?? envelope),
+    layerIds: new Set(layers.map((layer) => layer?.id).filter(Boolean)),
+    layerNames: new Set(layers.map((layer) => layer?.layer).filter(Boolean)),
+    nativeSourceIds: new Set(nativeSources.map((source) => source.id).filter(Boolean)),
+    nativeAstIds: new Set(nativeAsts.map((nativeAst) => nativeAst.id).filter(Boolean)),
+    nativeAstNodeIds: new Set(nativeAsts.flatMap((nativeAst) => Object.keys(nativeAst.nodes ?? {}))),
+    semanticNodeIds: new Set(Object.keys(document?.nodes ?? {})),
+    semanticIndexIds: new Set([semanticIndex?.id].filter(Boolean)),
+    semanticSymbolIds: new Set((semanticIndex?.symbols ?? []).map((symbol) => symbol.id)),
+    semanticOccurrenceIds: new Set((semanticIndex?.occurrences ?? []).map((occurrence) => occurrence.id)),
+    semanticRelationIds: new Set((semanticIndex?.relations ?? []).map((relation) => relation.id)),
+    semanticFactIds: new Set((semanticIndex?.facts ?? []).map((fact) => fact.id)),
+    sourceMapIds: new Set(sourceMaps.map((sourceMap) => sourceMap.id).filter(Boolean)),
+    sourceMapMappingIds: new Set(sourceMapMappingIds),
+    mergeCandidateIds: new Set(mergeCandidates.map((candidate) => candidate.id).filter(Boolean)),
+    lossIds: new Set(losses.map((loss) => loss.id).filter(Boolean)),
+    evidenceIds: new Set(evidence.map((record) => record.id).filter(Boolean)),
+    effectIds: collectEffectReferenceIds(document)
+  };
+}
+
+function collectEffectReferenceIds(document) {
+  const ids = [];
+  for (const node of Object.values(document?.nodes ?? {})) {
+    if (node.kind === "effect" || node.kind === "capability") {
+      ids.push(node.id, node.name, node.capability);
+    }
+    if (node.kind === "action") {
+      ids.push(...(node.uses ?? []));
+    }
+    for (const region of node.regions ?? []) {
+      if (region.access === "effect") {
+        ids.push(region.id);
+      }
+    }
+  }
+  return new Set(ids.filter(Boolean));
+}
+
+function validateReferenceIds(ids, targetIds, targetLabel, label, references, issues) {
+  const seen = new Set();
+  for (const id of ids ?? []) {
+    if (!id) {
+      issues.push(`${label} has empty ${targetLabel} reference`);
+      continue;
+    }
+    if (seen.has(id)) {
+      issues.push(`${label} has duplicate ${targetLabel} reference ${id}`);
+    }
+    seen.add(id);
+    validateReferenceId(id, targetIds, targetLabel, label, references, issues);
+  }
+}
+
+function validateReferenceId(id, targetIds, targetLabel, label, references, issues) {
+  if (!id) {
+    return;
+  }
+  if ((references.strict || targetIds.size > 0) && !targetIds.has(id)) {
+    issues.push(`${label} references missing ${targetLabel} ${id}`);
+  }
+}
+
+function validateUniversalAstReference(reference, label, references, issues) {
+  if (!reference || typeof reference !== "object") {
+    issues.push(`${label} has invalid reference`);
+    return;
+  }
+  if (!reference.kind) {
+    issues.push(`${label} reference ${reference.id ?? "(unknown)"} is missing kind`);
+  }
+  if (!reference.id) {
+    issues.push(`${label} has reference without id`);
+    return;
+  }
+  switch (reference.kind) {
+    case "layer":
+      validateReferenceId(reference.id, new Set([...references.layerIds, ...references.layerNames]), "layer", label, references, issues);
+      break;
+    case "nativeSource":
+      validateReferenceId(reference.id, references.nativeSourceIds, "native source", label, references, issues);
+      break;
+    case "nativeAst":
+      validateReferenceId(reference.id, references.nativeAstIds, "native AST", label, references, issues);
+      break;
+    case "nativeAstNode":
+      validateReferenceId(reference.id, references.nativeAstNodeIds, "native AST node", label, references, issues);
+      break;
+    case "semanticNode":
+      validateReferenceId(reference.id, references.semanticNodeIds, "semantic node", label, references, issues);
+      break;
+    case "semanticIndex":
+      validateReferenceId(reference.id, references.semanticIndexIds, "semantic index", label, references, issues);
+      break;
+    case "semanticSymbol":
+      validateReferenceId(reference.id, references.semanticSymbolIds, "semantic symbol", label, references, issues);
+      break;
+    case "semanticOccurrence":
+      validateReferenceId(reference.id, references.semanticOccurrenceIds, "semantic occurrence", label, references, issues);
+      break;
+    case "semanticRelation":
+      validateReferenceId(reference.id, references.semanticRelationIds, "semantic relation", label, references, issues);
+      break;
+    case "semanticFact":
+      validateReferenceId(reference.id, references.semanticFactIds, "semantic fact", label, references, issues);
+      break;
+    case "sourceMap":
+      validateReferenceId(reference.id, references.sourceMapIds, "source map", label, references, issues);
+      break;
+    case "sourceMapMapping":
+      validateReferenceId(reference.id, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+      break;
+    case "mergeCandidate":
+      validateReferenceId(reference.id, references.mergeCandidateIds, "merge candidate", label, references, issues);
+      break;
+    case "loss":
+      validateReferenceId(reference.id, references.lossIds, "loss", label, references, issues);
+      break;
+    case "evidence":
+      validateReferenceId(reference.id, references.evidenceIds, "evidence", label, references, issues);
+      break;
+    case "effect":
+      validateReferenceId(reference.id, references.effectIds, "effect", label, references, issues);
+      break;
+    default:
+      break;
+  }
+}
+
+function validateUniversalAstGraph(graph, label, references, issues) {
+  if (!graph) {
+    return;
+  }
+  if (typeof graph !== "object") {
+    issues.push(`${label} graph must be an object`);
+    return;
+  }
+  const graphNodeIds = new Set();
+  for (const node of graph.nodes ?? []) {
+    const nodeLabel = `${label} graph node ${node?.id ?? "(unknown)"}`;
+    if (!node?.id) {
+      issues.push(`${label} has graph node without id`);
+      continue;
+    }
+    if (graphNodeIds.has(node.id)) {
+      issues.push(`${label} has duplicate graph node ${node.id}`);
+    }
+    graphNodeIds.add(node.id);
+    validateReferenceId(node.nativeSourceId, references.nativeSourceIds, "native source", nodeLabel, references, issues);
+    validateReferenceId(node.nativeAstId, references.nativeAstIds, "native AST", nodeLabel, references, issues);
+    validateReferenceId(node.nativeAstNodeId, references.nativeAstNodeIds, "native AST node", nodeLabel, references, issues);
+    validateReferenceId(node.semanticNodeId, references.semanticNodeIds, "semantic node", nodeLabel, references, issues);
+    validateReferenceId(node.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", nodeLabel, references, issues);
+    validateReferenceId(node.semanticOccurrenceId, references.semanticOccurrenceIds, "semantic occurrence", nodeLabel, references, issues);
+    validateReferenceId(node.sourceMapId, references.sourceMapIds, "source map", nodeLabel, references, issues);
+    validateReferenceId(node.sourceMapMappingId, references.sourceMapMappingIds, "source map mapping", nodeLabel, references, issues);
+    validateReferenceIds(node.evidenceIds, references.evidenceIds, "evidence", nodeLabel, references, issues);
+    for (const reference of node.references ?? []) {
+      validateUniversalAstReference(reference, nodeLabel, references, issues);
+    }
+  }
+  for (const edge of graph.edges ?? []) {
+    const edgeLabel = `${label} graph edge ${edge?.id ?? "(unknown)"}`;
+    if (!edge?.id) {
+      issues.push(`${label} has graph edge without id`);
+      continue;
+    }
+    if (!edge.sourceId || !graphNodeIds.has(edge.sourceId)) {
+      issues.push(`${edgeLabel} references missing graph source ${edge.sourceId ?? "(missing)"}`);
+    }
+    if (!edge.targetId || !graphNodeIds.has(edge.targetId)) {
+      issues.push(`${edgeLabel} references missing graph target ${edge.targetId ?? "(missing)"}`);
+    }
+    validateReferenceId(edge.semanticNodeId, references.semanticNodeIds, "semantic node", edgeLabel, references, issues);
+    validateReferenceId(edge.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", edgeLabel, references, issues);
+    validateReferenceIds(edge.evidenceIds, references.evidenceIds, "evidence", edgeLabel, references, issues);
+    for (const reference of edge.references ?? []) {
+      validateUniversalAstReference(reference, edgeLabel, references, issues);
+    }
+  }
+  for (const entryId of graph.entryIds ?? []) {
+    if (!graphNodeIds.has(entryId)) {
+      issues.push(`${label} graph references missing entry node ${entryId}`);
+    }
+  }
+  for (const exitId of graph.exitIds ?? []) {
+    if (!graphNodeIds.has(exitId)) {
+      issues.push(`${label} graph references missing exit node ${exitId}`);
+    }
+  }
+}
+
+function validateUniversalAstRuntime(runtime, label, references, issues) {
+  if (!runtime) {
+    return;
+  }
+  if (typeof runtime !== "object") {
+    issues.push(`${label} runtime must be an object`);
+    return;
+  }
+  validateReferenceId(runtime.semanticNodeId, references.semanticNodeIds, "semantic node", `${label} runtime`, references, issues);
+  validateReferenceId(runtime.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", `${label} runtime`, references, issues);
+  validateReferenceIds(runtime.semanticNodeIds, references.semanticNodeIds, "semantic node", `${label} runtime`, references, issues);
+  validateReferenceIds(runtime.semanticSymbolIds, references.semanticSymbolIds, "semantic symbol", `${label} runtime`, references, issues);
+  validateReferenceIds(runtime.effectIds, references.effectIds, "effect", `${label} runtime`, references, issues);
+  validateReferenceIds(runtime.evidenceIds, references.evidenceIds, "evidence", `${label} runtime`, references, issues);
+  for (const entrypoint of runtime.entrypoints ?? []) {
+    const entryLabel = `${label} runtime entrypoint ${entrypoint?.id ?? entrypoint?.name ?? "(unknown)"}`;
+    validateReferenceId(entrypoint.semanticNodeId, references.semanticNodeIds, "semantic node", entryLabel, references, issues);
+    validateReferenceId(entrypoint.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", entryLabel, references, issues);
+    validateReferenceIds(entrypoint.effectIds, references.effectIds, "effect", entryLabel, references, issues);
+    validateReferenceIds(entrypoint.evidenceIds, references.evidenceIds, "evidence", entryLabel, references, issues);
+  }
 }
 
 function validateSourceMapMappingPrecision(mapping, sourceMap, label, issues) {

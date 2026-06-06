@@ -265,6 +265,39 @@ export interface SemanticIndexRecord {
 export type SourceMapPrecision = "exact" | "declaration" | "line" | "estimated" | "unknown" | string;
 export declare const SourceMapPrecisions: readonly SourceMapPrecision[];
 
+export type UniversalAstLayerName =
+  | "losslessSource"
+  | "cst"
+  | "semanticSymbols"
+  | "effects"
+  | "controlFlow"
+  | "dataFlow"
+  | "runtimeModel"
+  | "projectionEvidence"
+  | "mergeEvidence"
+  | string;
+export declare const UniversalAstLayerNames: readonly UniversalAstLayerName[];
+
+export type UniversalAstReferenceKind =
+  | "layer"
+  | "nativeSource"
+  | "nativeAst"
+  | "nativeAstNode"
+  | "semanticNode"
+  | "semanticIndex"
+  | "semanticSymbol"
+  | "semanticOccurrence"
+  | "semanticRelation"
+  | "semanticFact"
+  | "sourceMap"
+  | "sourceMapMapping"
+  | "mergeCandidate"
+  | "loss"
+  | "evidence"
+  | "effect"
+  | string;
+export declare const UniversalAstReferenceKinds: readonly UniversalAstReferenceKind[];
+
 export interface SourceMapGeneratedSpan extends SourceSpan {
   readonly target?: CompileTarget;
   readonly targetPath?: string;
@@ -332,6 +365,133 @@ export interface SourcePreservationRecord {
   readonly metadata?: JsonObject;
 }
 
+export interface UniversalAstLayerReference {
+  readonly kind: UniversalAstReferenceKind;
+  readonly id: string;
+  readonly layer?: UniversalAstLayerName;
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstLayerArtifact {
+  readonly id: string;
+  readonly kind:
+    | "sourceText"
+    | "tokenStream"
+    | "trivia"
+    | "cst"
+    | "semanticIndex"
+    | "effectGraph"
+    | "controlFlowGraph"
+    | "dataFlowGraph"
+    | "runtimeModel"
+    | "projection"
+    | "mergeEvidence"
+    | string;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstId?: string;
+  readonly nativeAstNodeId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly sourceMapId?: string;
+  readonly evidenceId?: string;
+  readonly path?: string;
+  readonly hash?: string;
+  readonly text?: string;
+  readonly data?: JsonValue;
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstLayerGraphNode {
+  readonly id: string;
+  readonly kind?: string;
+  readonly nativeSourceId?: SemanticId;
+  readonly nativeAstId?: string;
+  readonly nativeAstNodeId?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly semanticOccurrenceId?: string;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly evidenceIds?: readonly string[];
+  readonly references?: readonly UniversalAstLayerReference[];
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstLayerGraphEdge {
+  readonly id: string;
+  readonly kind?: string;
+  readonly sourceId: string;
+  readonly targetId: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly evidenceIds?: readonly string[];
+  readonly references?: readonly UniversalAstLayerReference[];
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstLayerGraph {
+  readonly nodes?: readonly UniversalAstLayerGraphNode[];
+  readonly edges?: readonly UniversalAstLayerGraphEdge[];
+  readonly entryIds?: readonly string[];
+  readonly exitIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstRuntimeEntrypoint {
+  readonly id?: string;
+  readonly name?: string;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly effectIds?: readonly string[];
+  readonly evidenceIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstRuntimeModel {
+  readonly id?: string;
+  readonly language?: FrontierSourceLanguage;
+  readonly target?: CompileTarget;
+  readonly semanticNodeId?: SemanticId;
+  readonly semanticSymbolId?: string;
+  readonly semanticNodeIds?: readonly SemanticId[];
+  readonly semanticSymbolIds?: readonly string[];
+  readonly effectIds?: readonly string[];
+  readonly entrypoints?: readonly UniversalAstRuntimeEntrypoint[];
+  readonly resources?: readonly string[];
+  readonly evidenceIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface UniversalAstLayerRecord {
+  readonly kind: "frontier.lang.universalAstLayer";
+  readonly version: 1;
+  readonly id: string;
+  readonly layer: UniversalAstLayerName;
+  readonly nativeSourceIds?: readonly SemanticId[];
+  readonly nativeAstIds?: readonly string[];
+  readonly nativeAstNodeIds?: readonly string[];
+  readonly semanticNodeIds?: readonly SemanticId[];
+  readonly semanticIndexId?: string;
+  readonly semanticSymbolIds?: readonly string[];
+  readonly semanticOccurrenceIds?: readonly string[];
+  readonly semanticRelationIds?: readonly string[];
+  readonly semanticFactIds?: readonly string[];
+  readonly sourceMapIds?: readonly string[];
+  readonly sourceMapMappingIds?: readonly string[];
+  readonly mergeCandidateIds?: readonly string[];
+  readonly lossIds?: readonly string[];
+  readonly evidenceIds: readonly string[];
+  readonly effectIds?: readonly string[];
+  readonly references: readonly UniversalAstLayerReference[];
+  readonly records: readonly JsonObject[];
+  readonly artifacts?: readonly UniversalAstLayerArtifact[];
+  readonly graph?: UniversalAstLayerGraph;
+  readonly runtime?: UniversalAstRuntimeModel;
+  readonly metadata?: JsonObject;
+}
+
+export type UniversalAstLayerMap = Readonly<Record<string, UniversalAstLayerRecord>>;
+
 export interface FrontierUniversalAstEnvelope {
   readonly kind: "frontier.lang.universalAst";
   readonly version: 1;
@@ -343,6 +503,8 @@ export interface FrontierUniversalAstEnvelope {
   readonly sourceMaps: readonly SourceMapRecord[];
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly layers?: UniversalAstLayerMap;
   readonly metadata?: JsonObject;
 }
 
@@ -774,12 +936,33 @@ export declare function validateSourceMapRecord(sourceMap: SourceMapRecord, cont
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
 }): readonly string[];
-export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence"> & {
+export declare function createUniversalAstLayer(input: Omit<UniversalAstLayerRecord, "kind" | "version" | "id" | "references" | "records" | "evidenceIds"> & {
+  readonly id?: string;
+  readonly references?: readonly UniversalAstLayerReference[];
+  readonly records?: readonly JsonObject[];
+  readonly evidenceIds?: readonly string[];
+}): UniversalAstLayerRecord;
+export declare function validateUniversalAstLayer(layer: UniversalAstLayerRecord, context?: {
+  readonly envelope?: FrontierUniversalAstEnvelope;
+  readonly document?: FrontierLangDocument;
+  readonly nativeSources?: readonly NativeSourceNode[];
+  readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps?: readonly SourceMapRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
+  readonly strict?: boolean;
+}): readonly string[];
+export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence" | "mergeCandidates" | "layers"> & {
   readonly schema?: FrontierUniversalAstEnvelope["schema"];
   readonly nativeSources?: readonly NativeSourceNode[];
   readonly sourceMaps?: readonly SourceMapRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
 }): FrontierUniversalAstEnvelope;
 export declare function validateUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): readonly string[];
 export declare function stableUniversalAstJson(envelope: FrontierUniversalAstEnvelope): string;
