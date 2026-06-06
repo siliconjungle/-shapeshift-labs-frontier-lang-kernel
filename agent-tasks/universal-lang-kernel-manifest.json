@@ -1,0 +1,19 @@
+{
+  "id": "frontier-lang-kernel-universal-wave-1",
+  "lanes": [
+    {
+      "id": "kernel-core",
+      "layer": "implementation",
+      "maxConcurrency": 4,
+      "allowedGlobs": ["src/index.js", "src/index.d.ts", "test/**", "README.md"],
+      "evidenceOutDirPrefix": "evidence/kernel-core/"
+    }
+  ],
+  "layers": [
+    { "id": "parent", "childCompute": { "implementation": "codex.deep" } },
+    { "id": "implementation", "parentId": "parent" }
+  ],
+  "compute": [
+    { "id": "codex.deep", "kind": "codex", "model": "config-default", "reasoningEffort": "xhigh" }
+  ]
+}

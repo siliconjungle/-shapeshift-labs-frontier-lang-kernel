@@ -1,0 +1,60 @@
+{
+  "items": [
+    {
+      "id": "kernel-universal-envelope-layers",
+      "lane": "kernel-core",
+      "surfaceKind": "universal AST envelope",
+      "ownedFiles": ["src/index.js", "src/index.d.ts", "test/smoke.mjs"],
+      "ownedRegions": ["universalAst.layers", "nativeAst.losslessSource", "semanticGraph.layers"],
+      "concurrencyKey": "kernel-universal-envelope",
+      "acceptanceChecks": [
+        { "description": "Universal AST envelopes can record lossless source/CST, semantic symbols, effects/control/dataflow, runtime model, and projection/merge evidence as separate layers." },
+        { "description": "Validation catches broken cross-layer references without making every optional layer mandatory." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"] }],
+      "prompt": "Improve the Frontier Lang kernel universal AST envelope so it better models the layered design needed for a universal language: source/CST, semantic index, effect/control/dataflow graph, runtime model, and transform/merge evidence. Keep it backwards compatible and dependency-free. Add tests and declarations."
+    },
+    {
+      "id": "kernel-source-preservation-losses",
+      "lane": "kernel-core",
+      "surfaceKind": "source preservation/loss accounting",
+      "ownedFiles": ["src/index.js", "src/index.d.ts", "test/smoke.mjs"],
+      "ownedRegions": ["sourceMap.validation", "loss.accounting", "source.preservation"],
+      "concurrencyKey": "kernel-source-preservation",
+      "acceptanceChecks": [
+        { "description": "Loss records and source maps can explain exact, declaration-level, estimated, and blocked preservation." },
+        { "description": "Validation detects dangling loss/evidence/source-map links and span precision problems." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"] }],
+      "prompt": "Tighten source preservation and loss accounting in frontier-lang-kernel. Add structured helpers or validation where useful, but keep API small. Tests should prove source map/loss/evidence links are queryable for semantic merge review."
+    },
+    {
+      "id": "kernel-semantic-merge-admission",
+      "lane": "kernel-core",
+      "surfaceKind": "semantic merge admission",
+      "ownedFiles": ["src/index.js", "src/index.d.ts", "test/smoke.mjs"],
+      "ownedRegions": ["semantic.mergeCandidate", "merge.admission", "conflict.keys"],
+      "concurrencyKey": "kernel-semantic-merge",
+      "acceptanceChecks": [
+        { "description": "Merge candidates expose stable conflict keys for symbols, regions, native spans, source subtrees, effects, and generated output." },
+        { "description": "Classification distinguishes safe, safe-with-losses, review-required, and blocked candidates with evidence reasons." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"] }],
+      "prompt": "Improve semantic merge admission in frontier-lang-kernel. Focus on conflict-key quality, readiness classification, evidence reasons, and tests. Do not auto-merge opaque/dynamic/effectful changes."
+    },
+    {
+      "id": "kernel-patch-replay-invariants",
+      "lane": "kernel-core",
+      "surfaceKind": "patch/replay invariants",
+      "ownedFiles": ["src/index.js", "src/index.d.ts", "test/smoke.mjs"],
+      "ownedRegions": ["patch.replay", "hash.invariants", "merge.laws"],
+      "concurrencyKey": "kernel-patch-replay",
+      "acceptanceChecks": [
+        { "description": "Patch replay/hash invariants are explicit enough for agents to use as evidence." },
+        { "description": "Tests cover invalid base hash, invalid target hash, duplicate ids, merge-law overlap, and disjoint safe patches." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"] }],
+      "prompt": "Harden patch/replay and merge-law invariants in frontier-lang-kernel. Add focused tests or helper APIs that make replayable state and semantic merging more inspectable. Keep backwards compatibility."
+    }
+  ]
+}

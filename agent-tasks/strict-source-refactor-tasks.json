@@ -1,0 +1,89 @@
+{
+  "items": [
+    {
+      "id": "kernel-source-graph-modules",
+      "lane": "kernel-source",
+      "surfaceKind": "strict source refactor",
+      "ownedFiles": ["src/index.js", "src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "allowedWrites": ["src/**", "scripts/build.mjs", "frontier.source-policy.json"],
+      "sourceRefs": ["src/index.js", "src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "targetRefs": ["src/index.js", "src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "ownedRegions": ["kernel.graph", "kernel.hashing", "kernel.evidence"],
+      "concurrencyKey": "kernel-src-index",
+      "acceptanceChecks": [
+        { "description": "Extract source graph, hashing, and evidence helpers from src/index.js into focused modules." },
+        { "description": "Update scripts/build.mjs to copy runtime/type modules to dist." },
+        { "description": "Preserve public API exports and remove/tighten strict policy exceptions for reduced files." }
+      ],
+      "verification": [
+        { "command": "npm", "args": ["run", "lint"] },
+        { "command": "npm", "args": ["test"] }
+      ],
+      "prompt": "Split Frontier Lang kernel graph/hash/evidence code out of the oversized src/index.js. Keep runtime-neutral behavior and package API stable. Update build/declarations/source-policy with only the necessary changes."
+    },
+    {
+      "id": "kernel-declarations-split",
+      "lane": "kernel-source",
+      "surfaceKind": "strict source refactor",
+      "ownedFiles": ["src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "allowedWrites": ["src/**", "scripts/build.mjs", "frontier.source-policy.json"],
+      "sourceRefs": ["src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "targetRefs": ["src/index.d.ts", "scripts/build.mjs", "frontier.source-policy.json"],
+      "ownedRegions": ["kernel.types"],
+      "concurrencyKey": "kernel-types",
+      "acceptanceChecks": [
+        { "description": "Split src/index.d.ts into smaller declaration modules and keep root re-exports." },
+        { "description": "Keep npm run typecheck and npm test passing." },
+        { "description": "Remove/tighten src/index.d.ts policy exception if possible." }
+      ],
+      "verification": [
+        { "command": "npm", "args": ["run", "lint"] },
+        { "command": "npm", "args": ["run", "typecheck"] },
+        { "command": "npm", "args": ["test"] }
+      ],
+      "prompt": "Refactor kernel declaration files into smaller modules. Preserve public API and build output. Keep root index.d.ts compatibility and run typecheck evidence."
+    },
+    {
+      "id": "kernel-smoke-tests-split",
+      "lane": "kernel-source",
+      "surfaceKind": "strict source refactor",
+      "ownedFiles": ["test/smoke.mjs", "frontier.source-policy.json"],
+      "allowedWrites": ["test/**", "frontier.source-policy.json"],
+      "sourceRefs": ["test/smoke.mjs", "frontier.source-policy.json"],
+      "targetRefs": ["test/smoke.mjs", "frontier.source-policy.json"],
+      "ownedRegions": ["kernel.tests.smoke"],
+      "concurrencyKey": "kernel-tests",
+      "acceptanceChecks": [
+        { "description": "Split kernel smoke tests into focused files/helpers under strict source limits." },
+        { "description": "Keep npm test command behavior equivalent." },
+        { "description": "Remove/tighten test/smoke.mjs exception if possible." }
+      ],
+      "verification": [
+        { "command": "npm", "args": ["run", "lint"] },
+        { "command": "npm", "args": ["test"] }
+      ],
+      "prompt": "Break up kernel test/smoke.mjs without weakening coverage. Preserve the existing test entrypoint and reduce strict-source-policy baseline entries."
+    },
+    {
+      "id": "kernel-readme-generator-split",
+      "lane": "kernel-source",
+      "surfaceKind": "strict source refactor",
+      "ownedFiles": ["benchmarks/package-readme-sections.mjs", "frontier.source-policy.json"],
+      "allowedWrites": ["benchmarks/**", "frontier.source-policy.json"],
+      "sourceRefs": ["benchmarks/package-readme-sections.mjs", "frontier.source-policy.json"],
+      "targetRefs": ["benchmarks/package-readme-sections.mjs", "frontier.source-policy.json"],
+      "ownedRegions": ["kernel.readmeGenerator"],
+      "concurrencyKey": "kernel-readme-generator",
+      "acceptanceChecks": [
+        { "description": "Split README package-section generator into smaller helper/data modules." },
+        { "description": "Keep readme:packages:check passing." },
+        { "description": "Remove/tighten generator oversized exception." }
+      ],
+      "verification": [
+        { "command": "npm", "args": ["run", "lint"] },
+        { "command": "npm", "args": ["run", "readme:packages:check"] }
+      ],
+      "prompt": "Split the kernel package README section generator without changing generated content. Keep strict lint and readme check green."
+    }
+  ]
+}

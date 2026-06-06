@@ -1,0 +1,43 @@
+{
+  "id": "frontier-lang-kernel-strict-source-refactor",
+  "title": "Frontier Lang Kernel Strict Source Refactor",
+  "description": "Split oversized kernel source, declarations, tests, and generator files so strict source policy can remove baseline exceptions.",
+  "compute": [
+    {
+      "id": "codex.deep",
+      "kind": "codex",
+      "model": "config-default",
+      "reasoningEffort": "xhigh"
+    }
+  ],
+  "policy": {
+    "defaultCompute": "codex.deep",
+    "defaultConcurrency": 4
+  },
+  "layers": [
+    {
+      "id": "implementation",
+      "title": "Implementation"
+    }
+  ],
+  "lanes": [
+    {
+      "id": "kernel-source",
+      "layer": "implementation",
+      "allowedWrites": [
+        "src/**",
+        "scripts/**",
+        "test/**",
+        "benchmarks/**",
+        "frontier.source-policy.json",
+        "package.json",
+        "package-lock.json",
+        "README.md"
+      ],
+      "evidencePrefix": "evidence/kernel-source"
+    }
+  ],
+  "metadata": {
+    "coordinatorGoal": "Reduce strict-source-policy baselines while preserving Frontier Lang kernel public API and runtime-neutral behavior."
+  }
+}

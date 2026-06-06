@@ -1,0 +1,82 @@
+{
+  "items": [
+    {
+      "id": "binding-pattern-type-facet",
+      "lane": "research",
+      "surfaceKind": "kernel design",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.bindingPatternType"],
+      "concurrencyKey": "paradigm-binding-pattern-type",
+      "acceptanceChecks": [
+        { "description": "Handoff recommends minimal kernel records for binding scopes, bindings, patterns, and type constraints across functional, OO, logic, macro, and dynamic languages." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Do a focused design pass for Frontier Lang kernel paradigm semantics. Inspect src/index.js, src/index.d.ts, README.md, test/smoke.mjs, and prior research handoffs. Do not edit source files. Produce a concise handoff under research/ covering binding scopes, bindings, patterns, and type constraints. Include expected validation rules, test cases, and how this supports importing languages like JS/TS, Rust, Python, Prolog, Lisp/Racket macros, and OO dispatch."
+    },
+    {
+      "id": "runtime-memory-effect-facet",
+      "lane": "research",
+      "surfaceKind": "kernel design",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.runtimeMemoryEffect"],
+      "concurrencyKey": "paradigm-runtime-memory-effect",
+      "acceptanceChecks": [
+        { "description": "Handoff recommends target-neutral records for evaluation models, memory locations, effect regions, and runtime assumptions." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Design the Frontier Lang kernel records needed for imperative/runtime semantics: evaluation model, memory locations, effect regions, control regions, resource/capability links, and runtime assumptions. Do not edit source. Anchor recommendations to current UniversalAstLayerRecord and proofSpec APIs and include validation/test ideas."
+    },
+    {
+      "id": "logic-actor-stack-array-facet",
+      "lane": "research",
+      "surfaceKind": "kernel design",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.logicActorStackArray"],
+      "concurrencyKey": "paradigm-logic-actor-stack-array",
+      "acceptanceChecks": [
+        { "description": "Handoff maps logic, actor, stack/concatenative, dataflow, array/numeric, and object models to structural kernel records." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Map non-mainstream programming paradigms into Frontier Lang kernel records: Prolog/logic rules and unification, Erlang actors/mailboxes, Forth/Factor stack effects, APL/Fortran array/numeric kernels, dataflow clocks, and object/message dispatch. Do not edit source. Recommend minimal records and validation/test cases."
+    },
+    {
+      "id": "macro-reflection-lowering-facet",
+      "lane": "research",
+      "surfaceKind": "kernel design",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.macroReflectionLowering"],
+      "concurrencyKey": "paradigm-macro-reflection-lowering",
+      "acceptanceChecks": [
+        { "description": "Handoff recommends macro expansion, reflection boundary, and lowering record shapes with source preservation links." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Design kernel-level records for macro expansion, reflection/dynamic runtime boundaries, and lowering/projection records. Use prior IR/source-map research. Do not edit source. Explain how records should connect to native AST losses, source maps, proofSpec, and merge evidence."
+    },
+    {
+      "id": "paradigm-validation-tests",
+      "lane": "research",
+      "surfaceKind": "kernel tests",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.validation"],
+      "concurrencyKey": "paradigm-validation-tests",
+      "acceptanceChecks": [
+        { "description": "Handoff lists focused smoke/fuzz/type tests needed for a paradigm semantics layer without overfitting to one target language." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Review current kernel tests and propose concrete tests for a new paradigm semantics universal AST layer. Do not edit source. Include good fixtures, broken-reference cases, fuzz strategy, and public d.ts expectations."
+    },
+    {
+      "id": "compiler-swarm-paradigm-sidecars",
+      "lane": "research",
+      "surfaceKind": "downstream integration",
+      "ownedFiles": ["research/**", "agent-runs/**"],
+      "ownedRegions": ["frontier.lang.paradigm.downstream"],
+      "concurrencyKey": "paradigm-downstream-sidecars",
+      "acceptanceChecks": [
+        { "description": "Handoff explains what compiler and swarm sidecar summaries should expose once kernel paradigm records exist." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Inspect compiler/swarm sidecar patterns from current package docs/source if present in workspace context. Do not edit source. Recommend concise summary fields for paradigm semantics records so merge admission can query language features, risks, and unsupported constructs."
+    }
+  ]
+}

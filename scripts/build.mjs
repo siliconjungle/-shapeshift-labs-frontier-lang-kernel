@@ -1,6 +1,13 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
 
 await rm("dist", { recursive: true, force: true });
 await mkdir("dist", { recursive: true });
-await copyFile("src/index.js", "dist/index.js");
-await copyFile("src/index.d.ts", "dist/index.d.ts");
+
+for (const entry of await readdir("src", { withFileTypes: true })) {
+  if (!entry.isFile()) {
+    continue;
+  }
+  if (entry.name.endsWith(".js") || entry.name.endsWith(".d.ts")) {
+    await copyFile(`src/${entry.name}`, `dist/${entry.name}`);
+  }
+}
