@@ -1,0 +1,82 @@
+{
+  "items": [
+    {
+      "id": "proof-assistant-kernel-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["proof.kernel.design"],
+      "concurrencyKey": "research-proof-assistants",
+      "acceptanceChecks": [
+        { "description": "Handoff maps proof-assistant concepts to Frontier Lang kernel records: contracts, refinements, obligations, artifacts, assumptions, and trusted boundaries." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Research proof-oriented languages for Frontier Lang kernel design. Focus on Rocq/Coq, Lean, Agda, Idris, F*, Dafny, Why3, Liquid Haskell, SPARK/Ada, TLA+, Alloy, CompCert, and seL4. Do not edit source files. Produce a concise evidence handoff with source URLs, transferable structures, and specific API recommendations for a dependency-free Frontier proof/spec layer."
+    },
+    {
+      "id": "universal-importer-parser-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["native.import.parsers"],
+      "concurrencyKey": "research-importers",
+      "acceptanceChecks": [
+        { "description": "Handoff maps major language parser/compiler AST sources to importer package responsibilities and sidecar evidence expectations." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Research parser/compiler AST ecosystems for universal language import. Cover tree-sitter, TypeScript compiler API/Babel/ESTree, Rust syn/rust-analyzer, Python ast/LibCST, Java javac/JDT/JavaParser, Go go/ast, SwiftSyntax, Kotlin PSI, C# Roslyn, Clang AST JSON/libclang. Do not edit source files. Produce a coordinator handoff with what each can preserve, what needs typechecker/compiler evidence, and how Frontier sidecars should classify loss."
+    },
+    {
+      "id": "ir-lowering-semantics-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["ir.lowering.semantics"],
+      "concurrencyKey": "research-ir",
+      "acceptanceChecks": [
+        { "description": "Handoff explains how layered IRs and executable semantics should shape Frontier Lang universal AST lowering/projection records." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Research IR/lowering/executable-semantics references for Frontier Lang. Cover LLVM IR, MLIR, WebAssembly, K Framework, Graal/Truffle if useful, and Code Property Graphs. Do not edit source files. Produce a handoff on layers, dialects, lowering, source maps, validation, and preserving high-level semantics before lowering."
+    },
+    {
+      "id": "paradigm-coverage-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["programming.paradigms"],
+      "concurrencyKey": "research-paradigms",
+      "acceptanceChecks": [
+        { "description": "Handoff identifies kernel records needed for functional, imperative, logic, dataflow, actor, stack/concatenative, array/numeric, OO, macro, and reflective language features." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Research programming paradigms that Frontier Lang must represent without flattening: functional/dependent, imperative, OO, logic/Prolog, dataflow/LabVIEW/Lucid, actor/Erlang, stack/concatenative Forth, array/numeric Fortran/APL lineage, macro/metaprogramming, reflection/dynamic runtime. Do not edit source files. Produce API implications and likely universal AST layer additions."
+    },
+    {
+      "id": "semantic-merge-proof-evidence-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["semantic.merge.evidence"],
+      "concurrencyKey": "research-merge-proof",
+      "acceptanceChecks": [
+        { "description": "Handoff defines how proof/spec evidence should affect swarm merge admission without becoming false correctness proof." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Research how proof/spec evidence should affect semantic merge admission for agent swarms. Include proof obligations, solver results, model-checker counterexamples, assumptions, stale proof invalidation, source-map/projection trust, and patch scoring. Do not edit source files. Produce concrete scoring/admission recommendations for frontier-swarm-codex and frontier-lang-compiler."
+    },
+    {
+      "id": "frontier-existing-libs-map",
+      "lane": "research",
+      "surfaceKind": "research",
+      "ownedFiles": ["agent-runs/**", "research/**"],
+      "ownedRegions": ["frontier.existing.libraries"],
+      "concurrencyKey": "research-frontier-libs",
+      "acceptanceChecks": [
+        { "description": "Handoff maps existing Frontier packages to universal-language layers and identifies reuse points instead of duplicating CRDT/scheduler/logging/test functionality." }
+      ],
+      "verification": [{ "command": "npm", "args": ["test"], "required": false }],
+      "prompt": "Inspect existing Frontier package responsibilities from README/AGENTS/package lists and map them to Frontier Lang universal AST layers. Focus on frontier-crdt, scheduler, event-log, trace, test, linter, effects, policy, worker/queue/swarm, and source-map/evidence packages. Do not edit source files. Produce reuse recommendations so Frontier Lang does not reimplement existing Frontier libraries."
+    }
+  ]
+}

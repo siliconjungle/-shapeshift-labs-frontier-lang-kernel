@@ -1,0 +1,25 @@
+{
+  "id": "frontier-lang-proof-paradigm-research-wave",
+  "lanes": [
+    {
+      "id": "research",
+      "layer": "research",
+      "maxConcurrency": 6,
+      "allowedGlobs": [
+        "README.md",
+        "src/**",
+        "test/**",
+        "research/**",
+        "agent-runs/**"
+      ],
+      "evidenceOutDirPrefix": "evidence/research/"
+    }
+  ],
+  "layers": [
+    { "id": "parent", "childCompute": { "research": "codex.deep" } },
+    { "id": "research", "parentId": "parent" }
+  ],
+  "compute": [
+    { "id": "codex.deep", "kind": "codex", "model": "config-default", "reasoningEffort": "xhigh" }
+  ]
+}

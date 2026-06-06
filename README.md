@@ -249,6 +249,23 @@ const candidate = createNativeAstMergeCandidate({
 console.log(candidate.conflictKeys); // symbol/node/native/span/subtree/signature keys
 ```
 
+## Proof And Spec Layer
+
+The universal AST envelope can also carry proof and specification records without binding the kernel to one prover or paradigm:
+
+```js
+import { createProofSpecLayer, createUniversalAstEnvelope } from '@shapeshift-labs/frontier-lang-kernel';
+
+const proof = createProofSpecLayer({
+  contracts: [{ id: 'non_empty_title', kind: 'precondition', subjectKind: 'semanticNode', subjectId: 'ent_todo', expression: 'title.length > 0' }],
+  obligations: [{ id: 'check_title', kind: 'contract', status: 'open', contractIds: ['non_empty_title'], statement: 'Callers provide a non-empty title.' }],
+  assumptions: [{ id: 'host_fetch_contract', scope: 'runtime', subjectKind: 'effect', subjectId: 'http.request' }]
+});
+
+const envelope = createUniversalAstEnvelope({ id: 'uast_todo', document, proof });
+console.log(envelope.layers.proofSpec.records[0]); // contract/obligation/artifact/assumption counts
+```
+
 ## Package Boundary
 
 - Parser: `@shapeshift-labs/frontier-lang-parser`

@@ -6,13 +6,17 @@ import {
   createNativeAstMergeCandidate,
   createNativeAstRecord,
   createPatch,
+  createProofSpecLayer,
   createSemanticIndexRecord,
   createSourceMapRecord,
+  createUniversalAstEnvelope,
   entityNode,
   hashDocumentBase,
   latticeNode,
   replayDocument,
-  validateDocument
+  validateDocument,
+  validateProofSpecLayer,
+  validateUniversalAstEnvelope
 } from '../dist/index.js';
 
 let seed = 0x12345678;
@@ -74,6 +78,22 @@ for (let index = 0; index < 100; index += 1) {
     id: `sourcemap_${index}`,
     mappings: [{ id: `map_${index}`, semanticNodeId: entity.id, nativeAstNodeId: `native_entity_${index}`, sourceSpan: { path: `src/entity_${index}.ts`, startLine: 1, startColumn: 1, endLine: 3, endColumn: 2 }, precision: 'declaration' }]
   });
+  const proofEvidence = { id: `proof_${index}`, kind: 'proof', status: 'passed' };
+  const proof = createProofSpecLayer({
+    id: `proof_spec_${index}`,
+    contracts: [{ id: `contract_${index}`, kind: 'invariant', subjectKind: 'semanticNode', subjectId: entity.id, statement: `${entity.name} fields preserve declared merge laws`, evidenceIds: [proofEvidence.id] }],
+    obligations: [{ id: `obligation_${index}`, kind: 'invariant', status: 'discharged', subjectKind: 'semanticNode', subjectId: entity.id, contractIds: [`contract_${index}`], statement: 'Generated invariant is dischargeable for the fuzz fixture.', evidenceIds: [proofEvidence.id] }],
+    evidence: [proofEvidence]
+  });
+  assert.deepEqual(validateProofSpecLayer(proof, { document, semanticIndex, sourceMaps: [sourceMap], evidence: [proofEvidence] }), []);
+  assert.deepEqual(validateUniversalAstEnvelope(createUniversalAstEnvelope({
+    id: `uast_${index}`,
+    document,
+    semanticIndex,
+    sourceMaps: [sourceMap],
+    proof,
+    evidence: [proofEvidence]
+  })), []);
   const candidate = createNativeAstMergeCandidate({
     document,
     nativeAst,

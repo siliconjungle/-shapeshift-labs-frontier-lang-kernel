@@ -272,6 +272,7 @@ export type UniversalAstLayerName =
   | "effects"
   | "controlFlow"
   | "dataFlow"
+  | "proofSpec"
   | "runtimeModel"
   | "projectionEvidence"
   | "mergeEvidence"
@@ -292,11 +293,46 @@ export type UniversalAstReferenceKind =
   | "sourceMap"
   | "sourceMapMapping"
   | "mergeCandidate"
+  | "proofContract"
+  | "proofObligation"
+  | "proofArtifact"
+  | "proofAssumption"
   | "loss"
   | "evidence"
   | "effect"
   | string;
 export declare const UniversalAstReferenceKinds: readonly UniversalAstReferenceKind[];
+
+export type ProofSpecContractKind =
+  | "precondition"
+  | "postcondition"
+  | "assertion"
+  | "frame"
+  | "refinement"
+  | "invariant"
+  | "termination"
+  | "temporal"
+  | "assumption"
+  | string;
+export declare const ProofSpecContractKinds: readonly ProofSpecContractKind[];
+
+export type ProofObligationStatus = "open" | "discharged" | "failed" | "unknown" | "stale" | "assumed" | string;
+export declare const ProofObligationStatuses: readonly ProofObligationStatus[];
+
+export type ProofArtifactKind = "solverRun" | "proofScript" | "modelCheck" | "counterexample" | "certificate" | "manualReview" | "testEvidence" | string;
+export declare const ProofArtifactKinds: readonly ProofArtifactKind[];
+
+export type ProofSubjectKind =
+  | "semanticNode"
+  | "semanticSymbol"
+  | "semanticOccurrence"
+  | "nativeSource"
+  | "nativeAst"
+  | "nativeAstNode"
+  | "sourceMap"
+  | "sourceMapMapping"
+  | "effect"
+  | string;
 
 export interface SourceMapGeneratedSpan extends SourceSpan {
   readonly target?: CompileTarget;
@@ -462,6 +498,99 @@ export interface UniversalAstRuntimeModel {
   readonly metadata?: JsonObject;
 }
 
+export interface ProofSpecRecordBase {
+  readonly id: string;
+  readonly kind: ProofSpecContractKind | string;
+  readonly subjectKind?: ProofSubjectKind;
+  readonly subjectId?: string;
+  readonly expression?: string;
+  readonly statement?: string;
+  readonly language?: FrontierSourceLanguage | string;
+  readonly sourceSpan?: SourceSpan;
+  readonly generatedSpan?: SourceMapGeneratedSpan;
+  readonly sourceMapId?: string;
+  readonly sourceMapMappingId?: string;
+  readonly evidenceIds?: readonly string[];
+  readonly lossIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface ProofContractRecord extends ProofSpecRecordBase {
+  readonly kind: ProofSpecContractKind;
+  readonly frame?: {
+    readonly reads?: readonly string[];
+    readonly writes?: readonly string[];
+    readonly effects?: readonly string[];
+  };
+}
+
+export interface ProofObligationRecord extends Omit<ProofSpecRecordBase, "kind"> {
+  readonly kind: "contract" | "refinement" | "invariant" | "termination" | "temporal" | "projection" | "merge" | string;
+  readonly status: ProofObligationStatus;
+  readonly contractIds?: readonly string[];
+  readonly assumptionIds?: readonly string[];
+  readonly artifactIds?: readonly string[];
+  readonly solver?: string;
+  readonly dischargedAt?: number;
+  readonly staleAgainstHash?: string;
+}
+
+export interface ProofArtifactRecord {
+  readonly id: string;
+  readonly kind: ProofArtifactKind;
+  readonly status?: ProofObligationStatus;
+  readonly path?: string;
+  readonly hash?: string;
+  readonly command?: string;
+  readonly prover?: string;
+  readonly obligationIds?: readonly string[];
+  readonly assumptionIds?: readonly string[];
+  readonly evidenceIds?: readonly string[];
+  readonly summary?: string;
+  readonly data?: JsonValue;
+  readonly metadata?: JsonObject;
+}
+
+export interface ProofAssumptionRecord {
+  readonly id: string;
+  readonly scope: "toolchain" | "compiler" | "runtime" | "host" | "hardware" | "foreignCode" | "humanReview" | string;
+  readonly subjectKind?: ProofSubjectKind;
+  readonly subjectId?: string;
+  readonly description?: string;
+  readonly evidenceIds?: readonly string[];
+  readonly metadata?: JsonObject;
+}
+
+export interface FrontierProofSpecLayer {
+  readonly kind: "frontier.lang.proofSpec";
+  readonly version: 1;
+  readonly id: string;
+  readonly contracts: readonly ProofContractRecord[];
+  readonly refinements: readonly ProofContractRecord[];
+  readonly invariants: readonly ProofContractRecord[];
+  readonly termination: readonly ProofContractRecord[];
+  readonly temporal: readonly ProofContractRecord[];
+  readonly obligations: readonly ProofObligationRecord[];
+  readonly artifacts: readonly ProofArtifactRecord[];
+  readonly assumptions: readonly ProofAssumptionRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
+export interface ProofSpecLayerInput {
+  readonly id?: string;
+  readonly contracts?: readonly ProofContractRecord[];
+  readonly refinements?: readonly ProofContractRecord[];
+  readonly invariants?: readonly ProofContractRecord[];
+  readonly termination?: readonly ProofContractRecord[];
+  readonly temporal?: readonly ProofContractRecord[];
+  readonly obligations?: readonly ProofObligationRecord[];
+  readonly artifacts?: readonly ProofArtifactRecord[];
+  readonly assumptions?: readonly ProofAssumptionRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly metadata?: JsonObject;
+}
+
 export interface UniversalAstLayerRecord {
   readonly kind: "frontier.lang.universalAstLayer";
   readonly version: 1;
@@ -504,6 +633,7 @@ export interface FrontierUniversalAstEnvelope {
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly proof?: FrontierProofSpecLayer;
   readonly layers?: UniversalAstLayerMap;
   readonly metadata?: JsonObject;
 }
@@ -942,6 +1072,20 @@ export declare function createUniversalAstLayer(input: Omit<UniversalAstLayerRec
   readonly records?: readonly JsonObject[];
   readonly evidenceIds?: readonly string[];
 }): UniversalAstLayerRecord;
+export declare function createProofSpecLayer(input?: ProofSpecLayerInput | FrontierProofSpecLayer): FrontierProofSpecLayer;
+export declare function validateProofSpecLayer(proof: FrontierProofSpecLayer, context?: {
+  readonly envelope?: FrontierUniversalAstEnvelope;
+  readonly document?: FrontierLangDocument;
+  readonly nativeSources?: readonly NativeSourceNode[];
+  readonly nativeAst?: NativeAstRecord;
+  readonly semanticIndex?: SemanticIndexRecord;
+  readonly sourceMaps?: readonly SourceMapRecord[];
+  readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly losses?: readonly NativeAstLossRecord[];
+  readonly evidence?: readonly EvidenceRecord[];
+  readonly proof?: FrontierProofSpecLayer;
+  readonly strict?: boolean;
+}): readonly string[];
 export declare function validateUniversalAstLayer(layer: UniversalAstLayerRecord, context?: {
   readonly envelope?: FrontierUniversalAstEnvelope;
   readonly document?: FrontierLangDocument;
@@ -955,13 +1099,14 @@ export declare function validateUniversalAstLayer(layer: UniversalAstLayerRecord
   readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
   readonly strict?: boolean;
 }): readonly string[];
-export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence" | "mergeCandidates" | "layers"> & {
+export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversalAstEnvelope, "kind" | "version" | "schema" | "nativeSources" | "sourceMaps" | "losses" | "evidence" | "mergeCandidates" | "proof" | "layers"> & {
   readonly schema?: FrontierUniversalAstEnvelope["schema"];
   readonly nativeSources?: readonly NativeSourceNode[];
   readonly sourceMaps?: readonly SourceMapRecord[];
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly proof?: ProofSpecLayerInput | FrontierProofSpecLayer;
   readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];
 }): FrontierUniversalAstEnvelope;
 export declare function validateUniversalAstEnvelope(envelope: FrontierUniversalAstEnvelope): readonly string[];

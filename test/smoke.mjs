@@ -13,6 +13,7 @@ import {
   createSemanticMergeCandidateFromImport,
   createSourceMapRecord,
   createSourcePreservationRecord,
+  createProofSpecLayer,
   createUniversalAstLayer,
   createUniversalAstEnvelope,
   entityNode,
@@ -24,6 +25,9 @@ import {
   latticeNode,
   nativeSourceNode,
   NativeAstLossKinds,
+  ProofArtifactKinds,
+  ProofObligationStatuses,
+  ProofSpecContractKinds,
   replayDocument,
   SourceMapPrecisions,
   SourcePreservationLevels,
@@ -33,6 +37,7 @@ import {
   validateDocument,
   validateSemanticIndexRecord,
   validateSourceMapRecord,
+  validateProofSpecLayer,
   validateUniversalAstLayer,
   validateUniversalAstEnvelope
 } from '../dist/index.js';
@@ -41,6 +46,10 @@ assert.equal(NativeAstLossKinds.includes('sourceMapApproximation'), true);
 assert.equal(SourceMapPrecisions.includes('declaration'), true);
 assert.equal(SourcePreservationLevels.includes('blocked'), true);
 assert.equal(UniversalAstLayerNames.includes('runtimeModel'), true);
+assert.equal(UniversalAstLayerNames.includes('proofSpec'), true);
+assert.equal(ProofSpecContractKinds.includes('precondition'), true);
+assert.equal(ProofObligationStatuses.includes('discharged'), true);
+assert.equal(ProofArtifactKinds.includes('solverRun'), true);
 
 const tagSet = latticeNode({
   id: 'lat_tag_set',
@@ -398,6 +407,61 @@ assert.deepEqual(validateSourceMapRecord(pointSourceMap), []);
 assert.equal(pointSourceMap.mappings[0].metadata.rawGeneratedLine0, 7);
 const projectionMergeEvidence = { id: 'merge_projection', kind: 'proof', status: 'passed', summary: 'Projection merge candidate is symbol anchored.' };
 const runtimeEvidence = { id: 'runtime_probe', kind: 'test', status: 'passed', summary: 'Runtime entrypoint model was checked.' };
+const proofEvidence = { id: 'proof_dafny_check', kind: 'proof', status: 'passed', summary: 'Dafny-style contract obligation was discharged.' };
+const proofSpec = createProofSpecLayer({
+  id: 'proof_todo',
+  contracts: [{
+    id: 'contract_todo_title_pre',
+    kind: 'precondition',
+    subjectKind: 'semanticNode',
+    subjectId: 'ent_todo',
+    expression: 'title.length > 0',
+    language: 'frontier',
+    evidenceIds: ['proof_dafny_check']
+  }],
+  invariants: [{
+    id: 'invariant_todo_tags_set',
+    kind: 'invariant',
+    subjectKind: 'semanticSymbol',
+    subjectId: 'symbol:Todo',
+    statement: 'tags is a join-semilattice',
+    evidenceIds: ['proof_dafny_check']
+  }],
+  obligations: [{
+    id: 'obligation_todo_title',
+    kind: 'contract',
+    status: 'discharged',
+    subjectKind: 'semanticNode',
+    subjectId: 'ent_todo',
+    contractIds: ['contract_todo_title_pre'],
+    artifactIds: ['artifact_solver_todo'],
+    statement: 'Todo title precondition holds before save.',
+    evidenceIds: ['proof_dafny_check']
+  }],
+  artifacts: [{
+    id: 'artifact_solver_todo',
+    kind: 'solverRun',
+    status: 'discharged',
+    obligationIds: ['obligation_todo_title'],
+    evidenceIds: ['proof_dafny_check'],
+    summary: 'SMT solver discharged precondition.'
+  }],
+  assumptions: [{
+    id: 'assumption_ts_runtime',
+    scope: 'runtime',
+    subjectKind: 'effect',
+    subjectId: 'http.request',
+    description: 'Fetch transport obeys the declared response contract.',
+    evidenceIds: ['proof_dafny_check']
+  }],
+  evidence: [proofEvidence]
+});
+assert.deepEqual(validateProofSpecLayer(proofSpec, {
+  document,
+  semanticIndex,
+  sourceMaps: [sourceMap],
+  evidence: [...semanticIndex.evidence, proofEvidence]
+}), []);
 const projectionMergeCandidate = createSemanticMergeCandidateRecord({
   id: 'merge_projection_todo',
   touchedSymbols: [{
@@ -532,8 +596,9 @@ const universalAst = createUniversalAstEnvelope({
   semanticIndex,
   sourceMaps: [sourceMap],
   mergeCandidates: [projectionMergeCandidate],
+  proof: proofSpec,
   layers: universalAstLayers,
-  evidence: [...semanticIndex.evidence, runtimeEvidence, projectionMergeEvidence]
+  evidence: [...semanticIndex.evidence, runtimeEvidence, projectionMergeEvidence, proofEvidence]
 });
 assert.deepEqual(validateUniversalAstEnvelope(universalAst), []);
 assert.equal(universalAst.nativeSources[0].id, 'native_source_todo');
@@ -548,7 +613,10 @@ assert.equal(universalAst.layers.dataFlow.graph.edges[0].kind, 'flowsTo');
 assert.equal(universalAst.layers.runtimeModel.runtime.entrypoints[0].effectIds[0], 'http.request');
 assert.equal(universalAst.layers.projectionEvidence.sourceMapIds[0], 'sourcemap_todo_ts');
 assert.equal(universalAst.layers.mergeEvidence.mergeCandidateIds[0], 'merge_projection_todo');
+assert.equal(universalAst.proof.contracts[0].id, 'contract_todo_title_pre');
+assert.equal(universalAst.layers.proofSpec.references.some((reference) => reference.kind === 'proofObligation' && reference.id === 'obligation_todo_title'), true);
 assert.deepEqual(validateUniversalAstLayer(universalAst.layers.controlFlow, { envelope: universalAst }), []);
+assert.deepEqual(validateUniversalAstLayer(universalAst.layers.proofSpec, { envelope: universalAst }), []);
 assert.match(stableUniversalAstJson(universalAst), /frontier\.lang\.universalAst/);
 assert.match(hashUniversalAstEnvelope(universalAst), /^fnv1a32:/);
 const partialUniversalAst = createUniversalAstEnvelope({
@@ -589,6 +657,21 @@ assert.match(brokenLayerIssues, /missing semantic node missing_node/);
 assert.match(brokenLayerIssues, /missing semantic symbol missing_symbol/);
 assert.match(brokenLayerIssues, /missing source map missing_sourcemap/);
 assert.match(brokenLayerIssues, /graph edge df_missing_target references missing graph target df_missing/);
+const brokenProofEnvelope = createUniversalAstEnvelope({
+  id: 'uast_broken_proof',
+  document,
+  semanticIndex,
+  proof: createProofSpecLayer({
+    contracts: [{
+      id: 'contract_missing_node',
+      kind: 'precondition',
+      subjectKind: 'semanticNode',
+      subjectId: 'missing_node',
+      expression: 'true'
+    }]
+  })
+});
+assert.match(validateUniversalAstEnvelope(brokenProofEnvelope).join('\n'), /missing semantic node missing_node/);
 const baseHash = hashDocumentBase(document);
 const nativeImportPatch = createPatch({
   id: 'native-import-todo',

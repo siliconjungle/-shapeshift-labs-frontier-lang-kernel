@@ -43,6 +43,7 @@ export const UniversalAstLayerNames = Object.freeze([
   "effects",
   "controlFlow",
   "dataFlow",
+  "proofSpec",
   "runtimeModel",
   "projectionEvidence",
   "mergeEvidence"
@@ -62,9 +63,44 @@ export const UniversalAstReferenceKinds = Object.freeze([
   "sourceMap",
   "sourceMapMapping",
   "mergeCandidate",
+  "proofContract",
+  "proofObligation",
+  "proofArtifact",
+  "proofAssumption",
   "loss",
   "evidence",
   "effect"
+]);
+
+export const ProofSpecContractKinds = Object.freeze([
+  "precondition",
+  "postcondition",
+  "assertion",
+  "frame",
+  "refinement",
+  "invariant",
+  "termination",
+  "temporal",
+  "assumption"
+]);
+
+export const ProofObligationStatuses = Object.freeze([
+  "open",
+  "discharged",
+  "failed",
+  "unknown",
+  "stale",
+  "assumed"
+]);
+
+export const ProofArtifactKinds = Object.freeze([
+  "solverRun",
+  "proofScript",
+  "modelCheck",
+  "counterexample",
+  "certificate",
+  "manualReview",
+  "testEvidence"
 ]);
 
 export function moduleNode(input) {
@@ -170,6 +206,32 @@ export function createUniversalAstLayer(input) {
     references: input.references ?? [],
     records: input.records ?? [],
     evidenceIds: input.evidenceIds ?? []
+  };
+}
+
+export function createProofSpecLayer(input = {}) {
+  const contracts = normalizeProofRecords(input.contracts, "contract");
+  const refinements = normalizeProofRecords(input.refinements, "refinement");
+  const invariants = normalizeProofRecords(input.invariants, "invariant");
+  const termination = normalizeProofRecords(input.termination, "termination");
+  const temporal = normalizeProofRecords(input.temporal, "temporal");
+  const obligations = normalizeProofRecords(input.obligations, "obligation");
+  const artifacts = normalizeProofRecords(input.artifacts, "artifact");
+  const assumptions = normalizeProofRecords(input.assumptions, "assumption");
+  return {
+    ...input,
+    kind: "frontier.lang.proofSpec",
+    version: 1,
+    id: input.id ?? "proof:spec",
+    contracts,
+    refinements,
+    invariants,
+    termination,
+    temporal,
+    obligations,
+    artifacts,
+    assumptions,
+    evidence: input.evidence ?? []
   };
 }
 
@@ -352,6 +414,39 @@ export function validateSourceMapRecord(sourceMap, context = {}) {
   return issues;
 }
 
+export function validateProofSpecLayer(proof, context = {}) {
+  const issues = [];
+  if (!proof || typeof proof !== "object") {
+    return ["Proof spec is not an object"];
+  }
+  const label = `Proof spec ${proof.id ?? "(unknown)"}`;
+  const references = createUniversalAstReferenceIndex({ ...context, proof });
+  if (proof.kind !== "frontier.lang.proofSpec") {
+    issues.push(`${label} has invalid kind`);
+  }
+  if (proof.version !== 1) {
+    issues.push(`${label} has unsupported version ${proof.version}`);
+  }
+  if (!proof.id) {
+    issues.push("Proof spec is missing id");
+  }
+
+  validateProofRecords(proof.contracts, "contract", references, issues);
+  validateProofRecords(proof.refinements, "refinement", references, issues);
+  validateProofRecords(proof.invariants, "invariant", references, issues);
+  validateProofRecords(proof.termination, "termination", references, issues);
+  validateProofRecords(proof.temporal, "temporal", references, issues);
+  validateProofObligations(proof.obligations, references, issues);
+  validateProofArtifacts(proof.artifacts, references, issues);
+  validateProofAssumptions(proof.assumptions, references, issues);
+  for (const evidence of proof.evidence ?? []) {
+    if (!evidence?.id) {
+      issues.push(`${label} has evidence without id`);
+    }
+  }
+  return issues;
+}
+
 export function validateUniversalAstLayer(layer, context = {}) {
   const issues = [];
   if (!layer || typeof layer !== "object") {
@@ -488,6 +583,7 @@ export function createUniversalAstEnvelope(input) {
   const sourceMaps = input.sourceMaps ?? [];
   const evidence = input.evidence ?? [];
   const mergeCandidates = input.mergeCandidates ?? [];
+  const proof = input.proof ? createProofSpecLayer(input.proof) : undefined;
   return {
     ...input,
     kind: "frontier.lang.universalAst",
@@ -498,13 +594,15 @@ export function createUniversalAstEnvelope(input) {
     losses,
     evidence,
     mergeCandidates,
+    ...(proof ? { proof } : {}),
     layers: normalizeUniversalAstLayers(input.layers, createDefaultUniversalAstLayers({
       nativeSources,
       semanticIndex: input.semanticIndex,
       sourceMaps,
       losses,
       evidence,
-      mergeCandidates
+      mergeCandidates,
+      proof
     }))
   };
 }
@@ -537,6 +635,9 @@ export function validateUniversalAstEnvelope(envelope) {
   }
   if (envelope.semanticIndex) {
     issues.push(...validateSemanticIndexRecord(envelope.semanticIndex).map((issue) => `semanticIndex: ${issue}`));
+  }
+  if (envelope.proof) {
+    issues.push(...validateProofSpecLayer(envelope.proof, { envelope }).map((issue) => `proof: ${issue}`));
   }
   for (const sourceMap of envelope.sourceMaps ?? []) {
     issues.push(...validateSourceMapRecord(sourceMap, {
@@ -1900,6 +2001,35 @@ function createDefaultUniversalAstLayers(input) {
     });
   }
 
+  if (input.proof) {
+    layers.proofSpec = createUniversalAstLayer({
+      id: "layer:proofSpec",
+      layer: "proofSpec",
+      records: [{
+        proofSpecId: input.proof.id,
+        contracts: input.proof.contracts.length,
+        refinements: input.proof.refinements.length,
+        invariants: input.proof.invariants.length,
+        termination: input.proof.termination.length,
+        temporal: input.proof.temporal.length,
+        obligations: input.proof.obligations.length,
+        artifacts: input.proof.artifacts.length,
+        assumptions: input.proof.assumptions.length
+      }],
+      references: [
+        ...input.proof.contracts.map((record) => ({ kind: "proofContract", id: record.id })),
+        ...input.proof.refinements.map((record) => ({ kind: "proofContract", id: record.id })),
+        ...input.proof.invariants.map((record) => ({ kind: "proofContract", id: record.id })),
+        ...input.proof.termination.map((record) => ({ kind: "proofContract", id: record.id })),
+        ...input.proof.temporal.map((record) => ({ kind: "proofContract", id: record.id })),
+        ...input.proof.obligations.map((record) => ({ kind: "proofObligation", id: record.id })),
+        ...input.proof.artifacts.map((record) => ({ kind: "proofArtifact", id: record.id })),
+        ...input.proof.assumptions.map((record) => ({ kind: "proofAssumption", id: record.id }))
+      ],
+      evidenceIds: collectProofEvidenceIds(input.proof)
+    });
+  }
+
   if (input.mergeCandidates.length > 0 || input.evidence.length > 0) {
     layers.mergeEvidence = createUniversalAstLayer({
       id: "layer:mergeEvidence",
@@ -1964,6 +2094,7 @@ function createUniversalAstReferenceIndex(context = {}) {
   const sourceMaps = context.sourceMaps ?? envelope?.sourceMaps ?? [];
   const mergeCandidates = context.mergeCandidates ?? envelope?.mergeCandidates ?? [];
   const layers = collectUniversalAstLayerRecords(context.layers ?? envelope?.layers);
+  const proof = context.proof ?? envelope?.proof;
   const nativeAsts = uniqueById([
     context.nativeAst,
     ...nativeSources.map((source) => source.ast)
@@ -1981,6 +2112,7 @@ function createUniversalAstReferenceIndex(context = {}) {
     ...(context.evidence ?? []),
     ...(envelope?.evidence ?? []),
     ...(semanticIndex?.evidence ?? []),
+    ...(proof?.evidence ?? []),
     ...sourceMaps.flatMap((sourceMap) => sourceMap.evidence ?? []),
     ...mergeCandidates.flatMap((candidate) => candidate.evidence ?? [])
   ];
@@ -2007,6 +2139,16 @@ function createUniversalAstReferenceIndex(context = {}) {
     sourceMapIds: new Set(sourceMaps.map((sourceMap) => sourceMap.id).filter(Boolean)),
     sourceMapMappingIds: new Set(sourceMapMappingIds),
     mergeCandidateIds: new Set(mergeCandidates.map((candidate) => candidate.id).filter(Boolean)),
+    proofContractIds: new Set([
+      ...(proof?.contracts ?? []),
+      ...(proof?.refinements ?? []),
+      ...(proof?.invariants ?? []),
+      ...(proof?.termination ?? []),
+      ...(proof?.temporal ?? [])
+    ].map((record) => record.id).filter(Boolean)),
+    proofObligationIds: new Set((proof?.obligations ?? []).map((record) => record.id).filter(Boolean)),
+    proofArtifactIds: new Set((proof?.artifacts ?? []).map((record) => record.id).filter(Boolean)),
+    proofAssumptionIds: new Set((proof?.assumptions ?? []).map((record) => record.id).filter(Boolean)),
     lossIds: new Set(losses.map((loss) => loss.id).filter(Boolean)),
     evidenceIds: new Set(evidence.map((record) => record.id).filter(Boolean)),
     effectIds: collectEffectReferenceIds(document)
@@ -2029,6 +2171,167 @@ function collectEffectReferenceIds(document) {
     }
   }
   return new Set(ids.filter(Boolean));
+}
+
+function normalizeProofRecords(records, prefix) {
+  return (records ?? []).map((record, index) => ({
+    ...record,
+    id: record.id ?? `${prefix}:${index + 1}`,
+    evidenceIds: record.evidenceIds ?? []
+  }));
+}
+
+function validateProofRecords(records, group, references, issues) {
+  collectUniqueIds(records ?? [], group, issues);
+  for (const record of records ?? []) {
+    const label = `Proof ${group} ${record?.id ?? "(unknown)"}`;
+    if (!record?.id) {
+      issues.push(`Proof ${group} is missing id`);
+      continue;
+    }
+    if (!record.kind) {
+      issues.push(`${label} is missing kind`);
+    }
+    if (!record.statement && !record.expression) {
+      issues.push(`${label} is missing statement or expression`);
+    }
+    validateProofSubject(record, label, references, issues);
+    validateReferenceIds(record.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+    validateReferenceIds(record.lossIds, references.lossIds, "loss", label, references, issues);
+    validateReferenceId(record.sourceMapId, references.sourceMapIds, "source map", label, references, issues);
+    validateReferenceId(record.sourceMapMappingId, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+    validateSourceSpan(record.sourceSpan, `${label} source span`, issues);
+    validateSourceSpan(record.generatedSpan, `${label} generated span`, issues);
+  }
+}
+
+function validateProofObligations(obligations, references, issues) {
+  collectUniqueIds(obligations ?? [], "proof obligation", issues);
+  for (const obligation of obligations ?? []) {
+    const label = `Proof obligation ${obligation?.id ?? "(unknown)"}`;
+    if (!obligation?.id) {
+      issues.push("Proof obligation is missing id");
+      continue;
+    }
+    if (!obligation.kind) {
+      issues.push(`${label} is missing kind`);
+    }
+    if (!obligation.status) {
+      issues.push(`${label} is missing status`);
+    }
+    if (!obligation.statement && !obligation.expression) {
+      issues.push(`${label} is missing statement or expression`);
+    }
+    validateProofSubject(obligation, label, references, issues);
+    validateReferenceIds(obligation.contractIds, references.proofContractIds, "proof contract", label, references, issues);
+    validateReferenceIds(obligation.assumptionIds, references.proofAssumptionIds, "proof assumption", label, references, issues);
+    validateReferenceIds(obligation.artifactIds, references.proofArtifactIds, "proof artifact", label, references, issues);
+    validateReferenceIds(obligation.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+    validateReferenceIds(obligation.lossIds, references.lossIds, "loss", label, references, issues);
+    validateSourceSpan(obligation.sourceSpan, `${label} source span`, issues);
+  }
+}
+
+function validateProofArtifacts(artifacts, references, issues) {
+  collectUniqueIds(artifacts ?? [], "proof artifact", issues);
+  for (const artifact of artifacts ?? []) {
+    const label = `Proof artifact ${artifact?.id ?? "(unknown)"}`;
+    if (!artifact?.id) {
+      issues.push("Proof artifact is missing id");
+      continue;
+    }
+    if (!artifact.kind) {
+      issues.push(`${label} is missing kind`);
+    }
+    validateReferenceIds(artifact.obligationIds, references.proofObligationIds, "proof obligation", label, references, issues);
+    validateReferenceIds(artifact.assumptionIds, references.proofAssumptionIds, "proof assumption", label, references, issues);
+    validateReferenceIds(artifact.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+  }
+}
+
+function validateProofAssumptions(assumptions, references, issues) {
+  collectUniqueIds(assumptions ?? [], "proof assumption", issues);
+  for (const assumption of assumptions ?? []) {
+    const label = `Proof assumption ${assumption?.id ?? "(unknown)"}`;
+    if (!assumption?.id) {
+      issues.push("Proof assumption is missing id");
+      continue;
+    }
+    if (!assumption.scope) {
+      issues.push(`${label} is missing scope`);
+    }
+    validateProofSubject(assumption, label, references, issues);
+    validateReferenceIds(assumption.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
+  }
+}
+
+function validateProofSubject(record, label, references, issues) {
+  if (!record?.subjectId) {
+    return;
+  }
+  const kind = record.subjectKind ?? inferProofSubjectKind(record.subjectId, references);
+  switch (kind) {
+    case "semanticNode":
+      validateReferenceId(record.subjectId, references.semanticNodeIds, "semantic node", label, references, issues);
+      break;
+    case "semanticSymbol":
+      validateReferenceId(record.subjectId, references.semanticSymbolIds, "semantic symbol", label, references, issues);
+      break;
+    case "semanticOccurrence":
+      validateReferenceId(record.subjectId, references.semanticOccurrenceIds, "semantic occurrence", label, references, issues);
+      break;
+    case "nativeSource":
+      validateReferenceId(record.subjectId, references.nativeSourceIds, "native source", label, references, issues);
+      break;
+    case "nativeAst":
+      validateReferenceId(record.subjectId, references.nativeAstIds, "native AST", label, references, issues);
+      break;
+    case "nativeAstNode":
+      validateReferenceId(record.subjectId, references.nativeAstNodeIds, "native AST node", label, references, issues);
+      break;
+    case "sourceMap":
+      validateReferenceId(record.subjectId, references.sourceMapIds, "source map", label, references, issues);
+      break;
+    case "sourceMapMapping":
+      validateReferenceId(record.subjectId, references.sourceMapMappingIds, "source map mapping", label, references, issues);
+      break;
+    case "effect":
+      validateReferenceId(record.subjectId, references.effectIds, "effect", label, references, issues);
+      break;
+    default:
+      if (references.strict) {
+        issues.push(`${label} references unknown proof subject ${record.subjectId}`);
+      }
+      break;
+  }
+}
+
+function inferProofSubjectKind(id, references) {
+  if (references.semanticNodeIds.has(id)) return "semanticNode";
+  if (references.semanticSymbolIds.has(id)) return "semanticSymbol";
+  if (references.semanticOccurrenceIds.has(id)) return "semanticOccurrence";
+  if (references.nativeSourceIds.has(id)) return "nativeSource";
+  if (references.nativeAstIds.has(id)) return "nativeAst";
+  if (references.nativeAstNodeIds.has(id)) return "nativeAstNode";
+  if (references.sourceMapIds.has(id)) return "sourceMap";
+  if (references.sourceMapMappingIds.has(id)) return "sourceMapMapping";
+  if (references.effectIds.has(id)) return "effect";
+  return undefined;
+}
+
+function collectProofEvidenceIds(proof) {
+  if (!proof) return [];
+  return unique([
+    ...(proof.evidence ?? []).map((record) => record.id),
+    ...proof.contracts.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.refinements.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.invariants.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.termination.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.temporal.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.obligations.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.artifacts.flatMap((record) => record.evidenceIds ?? []),
+    ...proof.assumptions.flatMap((record) => record.evidenceIds ?? [])
+  ].filter(Boolean));
 }
 
 function validateReferenceIds(ids, targetIds, targetLabel, label, references, issues) {
@@ -2106,6 +2409,18 @@ function validateUniversalAstReference(reference, label, references, issues) {
       break;
     case "mergeCandidate":
       validateReferenceId(reference.id, references.mergeCandidateIds, "merge candidate", label, references, issues);
+      break;
+    case "proofContract":
+      validateReferenceId(reference.id, references.proofContractIds, "proof contract", label, references, issues);
+      break;
+    case "proofObligation":
+      validateReferenceId(reference.id, references.proofObligationIds, "proof obligation", label, references, issues);
+      break;
+    case "proofArtifact":
+      validateReferenceId(reference.id, references.proofArtifactIds, "proof artifact", label, references, issues);
+      break;
+    case "proofAssumption":
+      validateReferenceId(reference.id, references.proofAssumptionIds, "proof assumption", label, references, issues);
       break;
     case "loss":
       validateReferenceId(reference.id, references.lossIds, "loss", label, references, issues);
