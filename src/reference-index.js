@@ -13,6 +13,7 @@ export function createUniversalAstReferenceIndex(context = {}) {
   const semanticIndex = context.semanticIndex ?? envelope?.semanticIndex;
   const sourceMaps = context.sourceMaps ?? envelope?.sourceMaps ?? [];
   const mergeCandidates = context.mergeCandidates ?? envelope?.mergeCandidates ?? [];
+  const semanticOperations = context.semanticOperations?.operations ?? context.semanticOperations ?? envelope?.semanticOperations?.operations ?? [];
   const layers = collectUniversalAstLayerRecords(context.layers ?? envelope?.layers);
   const proof = context.proof ?? envelope?.proof;
   const paradigmSemantics = context.paradigmSemantics ?? envelope?.paradigmSemantics;
@@ -61,6 +62,7 @@ export function createUniversalAstReferenceIndex(context = {}) {
     sourceMapIds: new Set(sourceMaps.map((sourceMap) => sourceMap.id).filter(Boolean)),
     sourceMapMappingIds: new Set(sourceMapMappingIds),
     mergeCandidateIds: new Set(mergeCandidates.map((candidate) => candidate.id).filter(Boolean)),
+    semanticOperationIds: new Set(semanticOperations.map((operation) => operation.id).filter(Boolean)),
     proofContractIds: new Set([
       ...(proof?.contracts ?? []),
       ...(proof?.refinements ?? []),
@@ -129,6 +131,7 @@ export function inferReferenceSubjectKind(id, references) {
   if (references.nativeAstNodeIds.has(id)) return "nativeAstNode";
   if (references.sourceMapIds.has(id)) return "sourceMap";
   if (references.sourceMapMappingIds.has(id)) return "sourceMapMapping";
+  if (references.semanticOperationIds.has(id)) return "semanticOperation";
   if (references.effectIds.has(id)) return "effect";
   return undefined;
 }
@@ -184,6 +187,9 @@ export function validateUniversalAstReference(reference, label, references, issu
       break;
     case "mergeCandidate":
       validateReferenceId(reference.id, references.mergeCandidateIds, "merge candidate", label, references, issues);
+      break;
+    case "semanticOperation":
+      validateReferenceId(reference.id, references.semanticOperationIds, "semantic operation", label, references, issues);
       break;
     case "proofContract":
       validateReferenceId(reference.id, references.proofContractIds, "proof contract", label, references, issues);

@@ -1,5 +1,6 @@
 import {
   createSemanticMergeCandidateRecord,
+  createSemanticOperationSet,
   createUniversalAstEnvelope,
   createUniversalAstLayer
 } from '../../dist/index.js';
@@ -18,6 +19,32 @@ export function createUniversalAstFixture() {
   } = fixture;
   const projectionMergeEvidence = { id: 'merge_projection', kind: 'proof', status: 'passed', summary: 'Projection merge candidate is symbol anchored.' };
   const runtimeEvidence = { id: 'runtime_probe', kind: 'test', status: 'passed', summary: 'Runtime entrypoint model was checked.' };
+  const semanticOperations = createSemanticOperationSet({
+    id: 'semantic_operations_todo',
+    operations: [
+      {
+        id: 'op_declare_todo',
+        operationKind: 'declaration',
+        language: 'typescript',
+        semanticNodeId: 'ent_todo',
+        semanticSymbolId: 'symbol:Todo',
+        nativeAstNodeId: 'native_todo_interface',
+        sourceMapId: 'sourcemap_todo_ts',
+        sourceMapMappingId: 'sourcemap_todo_ts:map_todo_interface',
+        evidenceId: 'sourcemap_build',
+        readiness: 'ready'
+      },
+      {
+        id: 'op_fetch_todo',
+        operationKind: 'effect',
+        language: 'typescript',
+        semanticNodeId: 'effect_fetch_todo',
+        effectId: 'http.request',
+        evidenceId: 'runtime_probe',
+        readiness: 'needs-review'
+      }
+    ]
+  });
   const projectionMergeCandidate = createSemanticMergeCandidateRecord({
     id: 'merge_projection_todo',
     touchedSymbols: [{
@@ -138,6 +165,18 @@ export function createUniversalAstFixture() {
       references: [{ kind: 'semanticSymbol', id: 'symbol:Todo' }],
       evidenceIds: ['sourcemap_build']
     }),
+    semanticOperations: createUniversalAstLayer({
+      id: 'layer_semantic_operations',
+      layer: 'semanticOperations',
+      semanticOperationIds: ['op_declare_todo', 'op_fetch_todo'],
+      semanticNodeIds: ['ent_todo', 'effect_fetch_todo'],
+      semanticSymbolIds: ['symbol:Todo'],
+      sourceMapIds: ['sourcemap_todo_ts'],
+      sourceMapMappingIds: ['sourcemap_todo_ts:map_todo_interface'],
+      effectIds: ['http.request'],
+      references: [{ kind: 'semanticOperation', id: 'op_declare_todo' }],
+      evidenceIds: ['sourcemap_build', 'runtime_probe']
+    }),
     mergeEvidence: createUniversalAstLayer({
       id: 'layer_merge_evidence',
       layer: 'mergeEvidence',
@@ -152,6 +191,7 @@ export function createUniversalAstFixture() {
     semanticIndex,
     sourceMaps: [sourceMap],
     mergeCandidates: [projectionMergeCandidate],
+    semanticOperations,
     proof: proofSpec,
     paradigmSemantics,
     layers: universalAstLayers,
@@ -163,6 +203,7 @@ export function createUniversalAstFixture() {
     projectionMergeCandidate,
     projectionMergeEvidence,
     runtimeEvidence,
+    semanticOperations,
     universalAst,
     universalAstLayers
   };

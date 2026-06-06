@@ -3,6 +3,7 @@ import './smoke/source-preservation.mjs';
 import './smoke/proof-paradigm.mjs';
 import './smoke/universal-ast.mjs';
 import './smoke/universal-envelope-layers.mjs';
+import './smoke/semantic-operations.mjs';
 import './smoke/semantic-merge-admission.mjs';
 import './smoke/patch-replay-invariants.mjs';
 import './smoke/import-merge.mjs';

@@ -36,6 +36,7 @@ export interface UniversalAstLayerArtifact {
   readonly nativeAstNodeId?: string;
   readonly semanticNodeId?: SemanticId;
   readonly semanticSymbolId?: string;
+  readonly semanticOperationId?: string;
   readonly sourceMapId?: string;
   readonly evidenceId?: string;
   readonly path?: string;
@@ -123,6 +124,7 @@ export interface UniversalAstLayerRecord {
   readonly sourceMapIds?: readonly string[];
   readonly sourceMapMappingIds?: readonly string[];
   readonly mergeCandidateIds?: readonly string[];
+  readonly semanticOperationIds?: readonly string[];
   readonly paradigmRecordIds?: readonly string[];
   readonly lossIds?: readonly string[];
   readonly evidenceIds: readonly string[];

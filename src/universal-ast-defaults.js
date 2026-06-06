@@ -56,6 +56,23 @@ export function createDefaultUniversalAstLayers(input) {
     });
   }
 
+  if (input.semanticOperations?.operations?.length > 0) {
+    const operations = input.semanticOperations.operations;
+    layers.semanticOperations = createUniversalAstLayer({
+      id: "layer:semanticOperations",
+      layer: "semanticOperations",
+      semanticOperationIds: operations.map((operation) => operation.id),
+      semanticNodeIds: unique(operations.flatMap((operation) => operation.semanticNodeIds)),
+      nativeAstNodeIds: unique(operations.flatMap((operation) => operation.nativeAstNodeIds)),
+      sourceMapIds: unique(operations.flatMap((operation) => operation.sourceMapIds)),
+      sourceMapMappingIds: unique(operations.flatMap((operation) => operation.sourceMapMappingIds)),
+      effectIds: unique(operations.flatMap((operation) => operation.effectIds)),
+      lossIds: unique(operations.flatMap((operation) => operation.lossIds)),
+      evidenceIds: unique(operations.flatMap((operation) => operation.evidenceIds)),
+      records: [{ semanticOperationSetId: input.semanticOperations.id, ...input.semanticOperations.summary }]
+    });
+  }
+
   if (input.proof) {
     layers.proofSpec = createUniversalAstLayer({
       id: "layer:proofSpec",

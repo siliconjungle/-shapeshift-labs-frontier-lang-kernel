@@ -20,6 +20,7 @@ for (const layerName of [
   'effects',
   'controlFlow',
   'dataFlow',
+  'semanticOperations',
   'runtimeModel',
   'projectionEvidence',
   'mergeEvidence'

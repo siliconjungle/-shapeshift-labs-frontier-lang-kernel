@@ -9,6 +9,7 @@ export * from "./patch-replay-invariants.js";
 export * from "./patching.js";
 export * from "./proof-spec.js";
 export * from "./semantic-merge-admission.js";
+export * from "./semantic-operations.js";
 export * from "./source-maps.js";
 export * from "./source-records.js";
 export * from "./universal-ast.js";

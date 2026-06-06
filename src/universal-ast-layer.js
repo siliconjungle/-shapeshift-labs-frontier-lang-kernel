@@ -44,6 +44,7 @@ export function validateUniversalAstLayer(layer, context = {}) {
   validateReferenceIds(layer.sourceMapIds, references.sourceMapIds, "source map", label, references, issues);
   validateReferenceIds(layer.sourceMapMappingIds, references.sourceMapMappingIds, "source map mapping", label, references, issues);
   validateReferenceIds(layer.mergeCandidateIds, references.mergeCandidateIds, "merge candidate", label, references, issues);
+  validateReferenceIds(layer.semanticOperationIds, references.semanticOperationIds, "semantic operation", label, references, issues);
   validateReferenceIds(layer.paradigmRecordIds, references.paradigmRecordIds, "paradigm record", label, references, issues);
   validateReferenceIds(layer.lossIds, references.lossIds, "loss", label, references, issues);
   validateReferenceIds(layer.evidenceIds, references.evidenceIds, "evidence", label, references, issues);
@@ -68,6 +69,7 @@ export function validateUniversalAstLayer(layer, context = {}) {
     validateReferenceId(artifact.nativeAstNodeId, references.nativeAstNodeIds, "native AST node", artifactLabel, references, issues);
     validateReferenceId(artifact.semanticNodeId, references.semanticNodeIds, "semantic node", artifactLabel, references, issues);
     validateReferenceId(artifact.semanticSymbolId, references.semanticSymbolIds, "semantic symbol", artifactLabel, references, issues);
+    validateReferenceId(artifact.semanticOperationId, references.semanticOperationIds, "semantic operation", artifactLabel, references, issues);
     validateReferenceId(artifact.sourceMapId, references.sourceMapIds, "source map", artifactLabel, references, issues);
     validateReferenceId(artifact.evidenceId, references.evidenceIds, "evidence", artifactLabel, references, issues);
   }

@@ -16,6 +16,7 @@ export type ProofSubjectKind =
   | "nativeAstNode"
   | "sourceMap"
   | "sourceMapMapping"
+  | "semanticOperation"
   | "effect"
   | string;
 

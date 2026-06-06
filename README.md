@@ -249,6 +249,17 @@ const candidate = createNativeAstMergeCandidate({
 console.log(candidate.conflictKeys); // symbol/node/native/span/subtree/signature keys
 ```
 
+## Semantic Operations
+Semantic operations describe reviewable program behavior, ownership, effects, and projection work in a language-neutral shape for swarm admission queues:
+```js
+import { createSemanticOperationSet } from '@shapeshift-labs/frontier-lang-kernel';
+const operations = createSemanticOperationSet({
+  operations: [{ id: 'op_fetch_todo', operationKind: 'effect', language: 'typescript', semanticNodeId: 'action_fetch_todo', effectId: 'http.request', dynamic: true }]
+});
+console.log(operations.summary.byOperationKind.effect); // 1
+console.log(operations.operations[0].autoMergeClaim); // false
+```
+
 ## Proof And Spec Layer
 
 The universal AST envelope can also carry proof and specification records without binding the kernel to one prover or paradigm:

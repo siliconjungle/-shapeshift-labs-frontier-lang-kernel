@@ -5,6 +5,7 @@ import type { FrontierParadigmSemanticsLayer, ParadigmSemanticsLayerInput } from
 import type { FrontierProofSpecLayer, ProofSpecLayerInput } from "./proof-spec.js";
 import type { NativeAstLossRecord, SemanticIndexRecord } from "./source-records.js";
 import type { SemanticMergeCandidateRecord } from "./merge-candidates.js";
+import type { SemanticOperationSet, SemanticOperationSetInput } from "./semantic-operations.js";
 import type { SourceMapRecord } from "./source-maps.js";
 import type { UniversalAstLayerMap, UniversalAstLayerRecord } from "./universal-ast-layer.js";
 
@@ -20,6 +21,7 @@ export interface FrontierUniversalAstEnvelope {
   readonly losses: readonly NativeAstLossRecord[];
   readonly evidence: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly semanticOperations?: SemanticOperationSet;
   readonly proof?: FrontierProofSpecLayer;
   readonly paradigmSemantics?: FrontierParadigmSemanticsLayer;
   readonly layers?: UniversalAstLayerMap;
@@ -33,6 +35,7 @@ export declare function createUniversalAstEnvelope(input: Omit<FrontierUniversal
   readonly losses?: readonly NativeAstLossRecord[];
   readonly evidence?: readonly EvidenceRecord[];
   readonly mergeCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly semanticOperations?: SemanticOperationSetInput | SemanticOperationSet;
   readonly proof?: ProofSpecLayerInput | FrontierProofSpecLayer;
   readonly paradigmSemantics?: ParadigmSemanticsLayerInput | FrontierParadigmSemanticsLayer;
   readonly layers?: UniversalAstLayerMap | readonly UniversalAstLayerRecord[];

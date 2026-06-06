@@ -1,5 +1,6 @@
 import { createParadigmSemanticsLayer, validateParadigmSemanticsLayer } from "./paradigm-semantics.js";
 import { createProofSpecLayer, validateProofSpecLayer } from "./proof-spec.js";
+import { createSemanticOperationSet } from "./semantic-operations.js";
 import { validateDocument } from "./document-validation.js";
 import { validateSemanticIndexRecord } from "./source-records.js";
 import { validateSourceMapRecord } from "./source-maps.js";
@@ -13,6 +14,7 @@ export function createUniversalAstEnvelope(input) {
   const sourceMaps = input.sourceMaps ?? [];
   const evidence = input.evidence ?? [];
   const mergeCandidates = input.mergeCandidates ?? [];
+  const semanticOperations = input.semanticOperations ? createSemanticOperationSet(input.semanticOperations) : undefined;
   const proof = input.proof ? createProofSpecLayer(input.proof) : undefined;
   const paradigmSemantics = input.paradigmSemantics ? createParadigmSemanticsLayer(input.paradigmSemantics) : undefined;
   return {
@@ -25,6 +27,7 @@ export function createUniversalAstEnvelope(input) {
     losses,
     evidence,
     mergeCandidates,
+    ...(semanticOperations ? { semanticOperations } : {}),
     ...(proof ? { proof } : {}),
     ...(paradigmSemantics ? { paradigmSemantics } : {}),
     layers: normalizeUniversalAstLayers(input.layers, createDefaultUniversalAstLayers({
@@ -34,6 +37,7 @@ export function createUniversalAstEnvelope(input) {
       losses,
       evidence,
       mergeCandidates,
+      semanticOperations,
       proof,
       paradigmSemantics
     }))
