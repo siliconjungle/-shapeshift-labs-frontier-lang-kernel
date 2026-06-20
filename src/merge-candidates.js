@@ -104,7 +104,7 @@ export function createSemanticMergeCandidateFromImport(input) {
     readiness: readiness.readiness,
     reasons: readiness.reasons,
     evidence,
-    metadata: input.metadata
+    metadata: mergeCandidateMetadata(importResult.metadata, input.metadata)
   });
 }
 
@@ -185,4 +185,14 @@ export function createNativeAstMergeCandidate(input) {
 
 function hasNativeImportMergeSurface(result) {
   return Boolean(result.patch || result.nativeAst || result.semanticIndex || result.universalAst?.semanticIndex);
+}
+
+function mergeCandidateMetadata(...records) {
+  const metadata = {};
+  for (const record of records) {
+    if (record && typeof record === "object") {
+      Object.assign(metadata, record);
+    }
+  }
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
 }

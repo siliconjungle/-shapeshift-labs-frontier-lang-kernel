@@ -1,0 +1,75 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "same-name-conflict",
+  "title": "Same-name declaration conflict",
+  "language": "typescript",
+  "category": "conflict",
+  "source": {
+    "base": "export interface User {\n  id: string;\n}\n",
+    "left": "export interface User {\n  id: string;\n}\n\nexport interface CacheEntry {\n  key: string;\n}\n",
+    "right": "export interface User {\n  id: string;\n}\n\nexport interface CacheEntry {\n  value: string;\n}\n"
+  },
+  "expected": {
+    "outcome": "same-name-conflict",
+    "decision": "conflict",
+    "autoMergeable": false,
+    "summary": "Both branches add the same declaration identity with incompatible members.",
+    "merge": {
+      "status": "conflict-by-overlap",
+      "overlappingNodeIds": ["type_cache_entry"],
+      "overlappingRegions": [],
+      "overlappingEffects": [],
+      "reasonIncludes": ["same semantic node or region"]
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_same_name_conflict",
+      "name": "SameNameConflict",
+      "nodes": [
+        {
+          "id": "type_user",
+          "kind": "type",
+          "name": "User",
+          "fields": [
+            { "id": "field_user_id", "name": "id", "type": "Text" }
+          ]
+        }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_add_cache_entry_key",
+      "operations": [
+        {
+          "op": "upsertNode",
+          "node": {
+            "id": "type_cache_entry",
+            "kind": "type",
+            "name": "CacheEntry",
+            "fields": [
+              { "id": "field_cache_key", "name": "key", "type": "Text" }
+            ]
+          }
+        }
+      ]
+    },
+    "rightPatch": {
+      "id": "right_add_cache_entry_value",
+      "operations": [
+        {
+          "op": "upsertNode",
+          "node": {
+            "id": "type_cache_entry",
+            "kind": "type",
+            "name": "CacheEntry",
+            "fields": [
+              { "id": "field_cache_value", "name": "value", "type": "Text" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

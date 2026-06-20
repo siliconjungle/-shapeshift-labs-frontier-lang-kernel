@@ -1,0 +1,51 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "no-op-roundtrip",
+  "title": "No-op roundtrip",
+  "language": "javascript",
+  "category": "roundtrip",
+  "source": {
+    "base": "export const answer = 42;\n",
+    "left": "export const answer = 42;\n",
+    "right": "export const answer = 42;\n"
+  },
+  "expected": {
+    "outcome": "no-op-roundtrip",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "Identical no-op branches preserve the source exactly.",
+    "merge": {
+      "status": "safe-by-same-change",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": [],
+      "reasonIncludes": ["same semantic operations"]
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_noop_roundtrip",
+      "name": "NoopRoundtrip",
+      "nodes": [
+        {
+          "id": "type_answer",
+          "kind": "type",
+          "name": "Answer",
+          "fields": [
+            { "id": "field_answer_value", "name": "value", "type": "Number" }
+          ]
+        }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_noop_roundtrip",
+      "operations": []
+    },
+    "rightPatch": {
+      "id": "right_noop_roundtrip",
+      "operations": []
+    }
+  }
+}

@@ -251,6 +251,26 @@ const candidate = createNativeAstMergeCandidate({
 console.log(candidate.conflictKeys); // symbol/node/native/span/subtree/signature keys
 ```
 
+## JS/TS Merge Contracts
+
+JS/TS parser adapters can preserve merge-ready imports, declarations, members, trivia, source spans, and structured conflict sidecars without pulling parser runtimes into the kernel:
+
+```js
+import { createJsTsMergeContractRecord } from '@shapeshift-labs/frontier-lang-kernel';
+
+const contract = createJsTsMergeContractRecord({
+  language: 'typescript',
+  sourcePath: 'src/todo.ts',
+  imports: [{ importKind: 'type', moduleSpecifier: './model.js', specifiers: [{ kind: 'named', importedName: 'Todo' }] }],
+  topLevelDeclarations: [{ declarationKind: 'interface', name: 'Todo', memberIds: ['member_title'] }],
+  members: [{ id: 'member_title', ownerDeclarationId: 'js-ts-declaration:Todo', memberKind: 'property', name: 'title' }],
+  trivia: [{ triviaKind: 'blockComment', placement: 'leading', attachedToId: 'js-ts-declaration:Todo' }],
+  conflictSidecars: [{ conflictKind: 'signature', targetKind: 'member', targetId: 'member_title', sides: [{ side: 'left' }, { side: 'right' }] }]
+});
+
+console.log(contract.conflictKeys); // import/declaration/member/trivia/conflict keys
+```
+
 ## Semantic Operations
 Semantic operations describe reviewable program behavior, ownership, effects, and projection work in a language-neutral shape for swarm admission queues:
 ```js

@@ -1,0 +1,54 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "unsafe-import-dynamic",
+  "title": "Unsafe dynamic import",
+  "language": "typescript",
+  "category": "import",
+  "source": {
+    "base": "export async function loadPlugin(name: string) {\n  return name;\n}\n",
+    "left": "export async function loadPlugin(name: string) {\n  return import(`./plugins/${name}.js`);\n}\n",
+    "right": "export async function loadPlugin(name: string) {\n  return name;\n}\n"
+  },
+  "expected": {
+    "outcome": "unsafe-import",
+    "decision": "review-required",
+    "autoMergeable": false,
+    "summary": "A computed dynamic import crosses an opaque effect boundary and needs review.",
+    "admission": {
+      "classification": "review-required",
+      "includesConflictKeyKinds": ["semantic-node", "effect", "custom"],
+      "reasonIncludes": ["Dynamic effect", "opaque or dynamic"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_dynamic_import_plugin",
+      "language": "typescript",
+      "sourcePath": "src/plugins.ts",
+      "touchedSymbols": [],
+      "touchedSemanticNodes": [
+        {
+          "id": "import_dynamic_plugin",
+          "kind": "import",
+          "name": "loadPlugin",
+          "conflictKey": "node:import_dynamic_plugin"
+        }
+      ],
+      "nativeSpans": [],
+      "conflictKeys": [
+        "effect:dynamic",
+        "import:dynamic:template-specifier"
+      ],
+      "readiness": "needs-review",
+      "reasons": ["Import specifier is computed at runtime."],
+      "evidence": [
+        { "id": "dynamic_import_parse", "kind": "import", "status": "passed", "summary": "Dynamic import syntax was detected." }
+      ],
+      "metadata": {
+        "dynamic": true
+      }
+    }
+  }
+}

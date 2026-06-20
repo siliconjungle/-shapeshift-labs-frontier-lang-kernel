@@ -1,0 +1,19 @@
+/* Interface fixture keeps comments and blank lines. */
+import type {
+  Formatter,
+  RenderContext
+} from "./types.js";
+
+export interface ViewModel<T extends string = string> {
+  /** Stable id comment. */
+  readonly id: T;
+
+  render(context: RenderContext): `${T}:${number}`;
+}
+
+export class Presenter implements Formatter {
+  public format(value: ViewModel): string {
+    const suffix = `${value.id}:${Date.now()}`;
+    return suffix.trim();
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "computed-member-conflict",
+  "title": "Computed member conflict",
+  "language": "typescript",
+  "category": "member",
+  "source": {
+    "base": "export class Profile {\n  first = '';\n  last = '';\n  get fullName() {\n    return this.first;\n  }\n}\n",
+    "left": "export class Profile {\n  first = '';\n  last = '';\n  get fullName() {\n    return `${this.first} ${this.last}`;\n  }\n}\n",
+    "right": "export class Profile {\n  first = '';\n  last = '';\n  get fullName() {\n    return this.first.toUpperCase();\n  }\n}\n"
+  },
+  "expected": {
+    "outcome": "computed-member-conflict",
+    "decision": "conflict",
+    "autoMergeable": false,
+    "summary": "Both branches rewrite the same computed accessor body.",
+    "merge": {
+      "status": "conflict-by-overlap",
+      "overlappingNodeIds": [],
+      "overlappingRegions": ["Profile.fullName"],
+      "overlappingEffects": [],
+      "reasonIncludes": ["same semantic node or region"]
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_computed_member_conflict",
+      "name": "ComputedMemberConflict",
+      "nodes": [
+        {
+          "id": "type_profile",
+          "kind": "type",
+          "name": "Profile",
+          "fields": [
+            { "id": "field_profile_first", "name": "first", "type": "Text" },
+            { "id": "field_profile_last", "name": "last", "type": "Text" }
+          ]
+        }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_rewrite_full_name_template",
+      "operations": [
+        {
+          "op": "addEvidence",
+          "evidence": { "id": "left_full_name_check", "kind": "test", "status": "passed" },
+          "touches": [
+            { "id": "Profile.fullName", "access": "write" }
+          ]
+        }
+      ]
+    },
+    "rightPatch": {
+      "id": "right_rewrite_full_name_upper",
+      "operations": [
+        {
+          "op": "addEvidence",
+          "evidence": { "id": "right_full_name_check", "kind": "test", "status": "passed" },
+          "touches": [
+            { "id": "Profile.fullName", "access": "write" }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -37,7 +37,16 @@ const importResult = createImportResult({
   semanticIndex,
   universalAst,
   losses: nativeAst.losses,
-  evidence: [{ id: 'import_parse', kind: 'import', status: 'passed', summary: 'Parsed TypeScript native AST with one loss record.' }]
+  evidence: [{ id: 'import_parse', kind: 'import', status: 'passed', summary: 'Parsed TypeScript native AST with one loss record.' }],
+  metadata: {
+    semanticMergeContract: {
+      id: 'contract_import_todo',
+      kind: 'import',
+      language: 'typescript',
+      safe: true,
+      requiredEvidenceIds: ['native_import_typecheck']
+    }
+  }
 });
 
 assert.equal(importResult.nativeAst.nodes.native_todo_interface.kind, 'InterfaceDeclaration');
@@ -57,6 +66,7 @@ assert.equal(mergeCandidate.conflictKeys.includes('node:ent_todo'), true);
 assert.equal(mergeCandidate.conflictKeys.includes('region:field_title'), true);
 assert.equal(mergeCandidate.conflictKeys.includes('symbol:symbol:Todo'), true);
 assert.equal(mergeCandidate.conflictKeys.some((key) => key.startsWith('native:src/todo.ts:1:1:4:2:native_todo_interface')), true);
+assert.equal(mergeCandidate.metadata.semanticMergeContract.id, 'contract_import_todo');
 assert.equal(createSemanticMergeCandidateFromImport({ importResult, id: 'merge-candidate:explicit' }).touchedSymbols[0].id, 'symbol:Todo');
 
 const nativeAstMergeCandidate = createNativeAstMergeCandidate({

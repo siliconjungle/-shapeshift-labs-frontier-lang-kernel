@@ -1,0 +1,62 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-top-level-add",
+  "title": "Safe top-level declaration add",
+  "language": "typescript",
+  "category": "declaration",
+  "source": {
+    "base": "export interface User {\n  id: string;\n}\n",
+    "left": "export interface User {\n  id: string;\n}\n",
+    "right": "export interface User {\n  id: string;\n}\n\nexport interface Settings {\n  theme: string;\n}\n"
+  },
+  "expected": {
+    "outcome": "safe-top-level-add",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "Adding a new top-level declaration against a no-op sibling is disjoint.",
+    "merge": {
+      "status": "safe-by-disjoint-region",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": []
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_safe_top_level_add",
+      "name": "SafeTopLevelAdd",
+      "nodes": [
+        {
+          "id": "type_user",
+          "kind": "type",
+          "name": "User",
+          "fields": [
+            { "id": "field_user_id", "name": "id", "type": "Text" }
+          ]
+        }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_noop_for_top_level_add",
+      "operations": []
+    },
+    "rightPatch": {
+      "id": "right_add_settings",
+      "operations": [
+        {
+          "op": "upsertNode",
+          "node": {
+            "id": "type_settings",
+            "kind": "type",
+            "name": "Settings",
+            "fields": [
+              { "id": "field_settings_theme", "name": "theme", "type": "Text" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

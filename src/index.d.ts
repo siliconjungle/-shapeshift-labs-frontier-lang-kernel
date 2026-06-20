@@ -1,9 +1,31 @@
 export * from "./base.js";
 export * from "./constants.js";
+export * from "./decision-graph-records.js";
 export * from "./document.js";
 export * from "./document-validation.js";
 export * from "./evidence.js";
 export * from "./hashing.js";
+export * from "./js-ts-merge-contracts.js";
+export {
+  classifyTopLevelJsTsDeclarationMerge,
+  collectTopLevelJsTsDeclarations,
+  JS_TS_TOP_LEVEL_DECLARATION_MERGE_CLASSIFICATIONS,
+  topLevelJsTsDeclarationIdentityKey
+} from "./js-ts-declarations.js";
+export type {
+  JsTsTopLevelDeclarationChangeKind,
+  JsTsTopLevelDeclarationExportKind,
+  JsTsTopLevelDeclarationKind as ParsedJsTsTopLevelDeclarationKind,
+  JsTsTopLevelDeclarationClassificationRecord,
+  JsTsTopLevelDeclarationMergeAdmissionRecord,
+  JsTsTopLevelDeclarationMergeClassification,
+  JsTsTopLevelDeclarationMergeInput,
+  JsTsTopLevelDeclarationMergeLaw,
+  JsTsTopLevelDeclarationMergeSide,
+  JsTsTopLevelDeclarationOptions,
+  JsTsTopLevelDeclarationRecord as ParsedJsTsTopLevelDeclarationRecord,
+  JsTsVariableDeclarationKind
+} from "./js-ts-declarations.js";
 export * from "./merge-candidates.js";
 export * from "./paradigm-semantics.js";
 export * from "./patch-replay-invariants.js";
@@ -11,6 +33,8 @@ export * from "./patching.js";
 export * from "./proof-spec.js";
 export * from "./semantic-merge-admission.js";
 export * from "./semantic-operations.js";
+export * from "./source-roundtrip.js";
+export * from "./source-trivia-ledger.js";
 export * from "./source-maps.js";
 export * from "./source-records.js";
 export * from "./universal-ast.js";

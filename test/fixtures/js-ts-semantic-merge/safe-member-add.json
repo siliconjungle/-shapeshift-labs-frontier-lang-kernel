@@ -1,0 +1,61 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-member-add",
+  "title": "Safe interface member add",
+  "language": "typescript",
+  "category": "member",
+  "source": {
+    "base": "export interface Profile {\n  id: string;\n}\n",
+    "left": "export interface Profile {\n  id: string;\n}\n",
+    "right": "export interface Profile {\n  id: string;\n  email: string;\n}\n"
+  },
+  "expected": {
+    "outcome": "safe-member-add",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "Adding one concrete member against a no-op sibling is disjoint.",
+    "merge": {
+      "status": "safe-by-disjoint-region",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": []
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_safe_member_add",
+      "name": "SafeMemberAdd",
+      "nodes": [
+        {
+          "id": "type_profile",
+          "kind": "type",
+          "name": "Profile",
+          "fields": [
+            { "id": "field_profile_id", "name": "id", "type": "Text" }
+          ]
+        }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_noop_for_member_add",
+      "operations": []
+    },
+    "rightPatch": {
+      "id": "right_add_profile_email",
+      "operations": [
+        {
+          "op": "updateNode",
+          "id": "type_profile",
+          "set": {
+            "fields": [
+              { "id": "field_profile_id", "name": "id", "type": "Text" },
+              { "id": "field_profile_email", "name": "email", "type": "Text" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

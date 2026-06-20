@@ -40,6 +40,40 @@
       ".turbo",
       "out"
     ],
-    "allowedOversizedFiles": {}
+    "allowedOversizedFiles": {
+      "src/decision-graph-records.d.ts": {
+        "maxLines": 360,
+        "reason": "Typed decision graph record contracts are intentionally grouped so graph consumers get one stable data surface."
+      },
+      "src/decision-graph-records.js": {
+        "maxLines": 420,
+        "reason": "Typed decision graph record constructors are intentionally grouped with their shared normalization helpers."
+      },
+      "src/js-ts-declarations.js": {
+        "maxLines": 820,
+        "reason": "Dependency-free JS/TS declaration scanner keeps tokenization and merge classification in one parser unit."
+      },
+      "src/js-ts-merge-contracts.d.ts": {
+        "maxLines": 400,
+        "reason": "JS/TS merge contract records are intentionally grouped as one public contract surface."
+      },
+      "src/js-ts-merge-contracts.js": {
+        "maxLines": 360,
+        "reason": "JS/TS merge contract constructors are intentionally grouped with their shared conflict-key helpers."
+      },
+      "src/semantic-merge-admission.js": {
+        "maxLines": 1100,
+        "maxChars": 42000,
+        "reason": "Semantic merge admission coordinates contract, sidecar, and conflict classification in one admission unit."
+      },
+      "src/source-roundtrip.js": {
+        "maxLines": 720,
+        "reason": "No-op source roundtrip scanner keeps lexical scanning, reconstruction, and feature summarization together."
+      },
+      "src/source-trivia-ledger.js": {
+        "maxLines": 780,
+        "reason": "Source span/trivia ledger keeps source scanning and deterministic conflict-key generation together."
+      }
+    }
   }
 }

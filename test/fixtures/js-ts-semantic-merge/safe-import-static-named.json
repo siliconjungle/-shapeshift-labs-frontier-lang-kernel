@@ -1,0 +1,74 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-import-static-named",
+  "title": "Safe static named import",
+  "language": "typescript",
+  "category": "import",
+  "source": {
+    "base": "export function load(path: string) {\n  return path;\n}\n",
+    "left": "import { readFile } from 'node:fs/promises';\n\nexport async function load(path: string) {\n  return readFile(path, 'utf8');\n}\n",
+    "right": "export function load(path: string) {\n  return path;\n}\n"
+  },
+  "expected": {
+    "outcome": "safe-import",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "A deterministic static named import is symbol, node, span, and signature anchored.",
+    "admission": {
+      "classification": "safe",
+      "includesConflictKeyKinds": ["symbol", "semantic-node", "native-span", "signature", "custom"],
+      "reasonIncludes": ["Stable conflict keys cover"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_safe_import_read_file",
+      "language": "typescript",
+      "sourcePath": "src/load.ts",
+      "touchedSymbols": [
+        {
+          "id": "symbol:readFile",
+          "name": "readFile",
+          "kind": "import",
+          "semanticNodeId": "import_read_file",
+          "nativeAstNodeId": "import_decl_read_file",
+          "conflictKey": "symbol:symbol:readFile"
+        }
+      ],
+      "touchedSemanticNodes": [
+        {
+          "id": "import_read_file",
+          "kind": "import",
+          "name": "readFile",
+          "conflictKey": "node:import_read_file"
+        }
+      ],
+      "nativeSpans": [
+        {
+          "id": "span_import_read_file",
+          "path": "src/load.ts",
+          "language": "typescript",
+          "nativeAstNodeId": "import_decl_read_file",
+          "semanticNodeId": "import_read_file",
+          "symbolId": "symbol:readFile",
+          "span": { "path": "src/load.ts", "startLine": 1, "startColumn": 1, "endLine": 1, "endColumn": 46 },
+          "conflictKey": "native:src/load.ts:1:1:1:46:import_decl_read_file"
+        }
+      ],
+      "conflictKeys": [
+        "import:node%3Afs/promises:readFile",
+        "sig:typescript:symbol:readFile:fnv1a32:static"
+      ],
+      "readiness": "ready",
+      "reasons": ["Static import specifier has stable module and binding names."],
+      "evidence": [
+        { "id": "safe_import_parse", "kind": "import", "status": "passed", "summary": "Static import parsed without losses." }
+      ]
+    },
+    "admissionOptions": {
+      "requiredConflictKeyKinds": ["symbol", "semantic-node", "native-span", "signature"]
+    }
+  }
+}

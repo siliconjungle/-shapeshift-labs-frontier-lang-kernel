@@ -1,0 +1,25 @@
+// Preserve module comments before imports.
+import defaultThing, {
+  helper as renamed,
+  value
+} from "./dep.js";
+
+export const renderMessage = (name) => {
+  const label = `Hello ${name}
+from ${renamed(value)}`;
+  return defaultThing(label);
+};
+
+export class Widget extends HTMLElement {
+  // Keep class member spacing.
+  static tag = "x-widget";
+
+  constructor() {
+    super();
+    this.innerHTML = `<button>${this.title}</button>`;
+  }
+
+  get title() {
+    return "Widget";
+  }
+}
