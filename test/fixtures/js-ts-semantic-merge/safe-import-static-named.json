@@ -5,6 +5,7 @@
   "title": "Safe static named import",
   "language": "typescript",
   "category": "import",
+  "coverage": ["imports"],
   "source": {
     "base": "export function load(path: string) {\n  return path;\n}\n",
     "left": "import { readFile } from 'node:fs/promises';\n\nexport async function load(path: string) {\n  return readFile(path, 'utf8');\n}\n",

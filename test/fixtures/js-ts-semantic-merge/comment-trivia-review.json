@@ -1,0 +1,67 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "comment-trivia-review",
+  "title": "Comment trivia needs review",
+  "language": "typescript",
+  "category": "comment",
+  "coverage": ["comments"],
+  "source": {
+    "base": "export interface Config {\n  url: string;\n}\n",
+    "left": "/** Runtime endpoint. */\nexport interface Config {\n  url: string;\n}\n",
+    "right": "export interface Config {\n  url: string;\n}\n"
+  },
+  "expected": {
+    "outcome": "comment-trivia-review",
+    "decision": "review-required",
+    "autoMergeable": false,
+    "summary": "Detached comment trivia is source-preserved but not a safe JS/TS auto-merge contract kind.",
+    "admission": {
+      "classification": "review-required",
+      "includesConflictKeyKinds": ["symbol", "semantic-node", "region", "native-span", "source-preservation", "signature"],
+      "reasonIncludes": ["unsupported safe-case kind trivia"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_comment_trivia_config",
+      "language": "typescript",
+      "sourcePath": "src/config.ts",
+      "touchedSymbols": [
+        { "id": "symbol:Config", "name": "Config", "kind": "interface", "semanticNodeId": "type_config", "nativeAstNodeId": "native_config_interface", "conflictKey": "symbol:symbol:Config" }
+      ],
+      "touchedSemanticNodes": [
+        { "id": "type_config", "kind": "type", "name": "Config", "conflictKey": "node:type_config" }
+      ],
+      "nativeSpans": [
+        {
+          "id": "span_config_comment",
+          "nativeAstNodeId": "native_config_comment",
+          "semanticNodeId": "type_config",
+          "symbolId": "symbol:Config",
+          "span": { "path": "src/config.ts", "startLine": 1, "startColumn": 1, "endLine": 1, "endColumn": 24 },
+          "conflictKey": "native:src/config.ts:1:1:1:24:native_config_comment"
+        }
+      ],
+      "conflictKeys": [
+        "region:Config.leadingComment",
+        "source-preservation:map_config:trivia:declaration:symbol%3AConfig",
+        "sig:typescript:symbol:Config:fnv1a32:comment"
+      ],
+      "readiness": "ready",
+      "evidence": [
+        { "id": "comment_trivia_scan", "kind": "test", "status": "passed" }
+      ],
+      "metadata": {
+        "semanticMergeContract": {
+          "id": "contract_comment_trivia",
+          "kind": "trivia",
+          "language": "typescript",
+          "safe": true,
+          "requiredEvidenceIds": ["comment_trivia_scan"]
+        }
+      }
+    }
+  }
+}

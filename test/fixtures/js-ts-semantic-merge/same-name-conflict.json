@@ -5,6 +5,7 @@
   "title": "Same-name declaration conflict",
   "language": "typescript",
   "category": "conflict",
+  "coverage": ["interfaces", "conflicts"],
   "source": {
     "base": "export interface User {\n  id: string;\n}\n",
     "left": "export interface User {\n  id: string;\n}\n\nexport interface CacheEntry {\n  key: string;\n}\n",
@@ -15,6 +16,7 @@
     "decision": "conflict",
     "autoMergeable": false,
     "summary": "Both branches add the same declaration identity with incompatible members.",
+    "apply": { "classification": "conflict-by-overlap" },
     "merge": {
       "status": "conflict-by-overlap",
       "overlappingNodeIds": ["type_cache_entry"],

@@ -1,0 +1,55 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "stale-edit-review",
+  "title": "Stale edit needs review",
+  "language": "typescript",
+  "category": "stale-edit",
+  "coverage": ["stale-edits"],
+  "source": {
+    "base": "export interface Profile {\n  id: string;\n}\n",
+    "left": "export interface Profile {\n  id: string;\n  email: string;\n}\n",
+    "right": "export interface Profile {\n  id: string;\n}\n"
+  },
+  "expected": {
+    "outcome": "stale-edit-review",
+    "decision": "review-required",
+    "autoMergeable": false,
+    "summary": "A patch with a stale base hash cannot be applied to the current base without review.",
+    "apply": { "classification": "unknown-needs-review" },
+    "merge": {
+      "status": "unknown-needs-review",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": [],
+      "reasonIncludes": ["base hash"]
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_stale_edit_review",
+      "name": "StaleEditReview",
+      "nodes": [
+        { "id": "type_profile", "kind": "type", "name": "Profile", "fields": [{ "id": "field_profile_id", "name": "id", "type": "Text" }] }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_stale_profile_email",
+      "baseHash": "fnv1a32:stale0000",
+      "operations": [
+        {
+          "op": "updateNode",
+          "id": "type_profile",
+          "set": {
+            "fields": [
+              { "id": "field_profile_id", "name": "id", "type": "Text" },
+              { "id": "field_profile_email", "name": "email", "type": "Text" }
+            ]
+          }
+        }
+      ]
+    },
+    "rightPatch": { "id": "right_noop_for_stale_edit", "operations": [] }
+  }
+}

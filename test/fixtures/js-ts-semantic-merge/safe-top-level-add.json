@@ -5,6 +5,7 @@
   "title": "Safe top-level declaration add",
   "language": "typescript",
   "category": "declaration",
+  "coverage": ["interfaces", "safe-declaration-adds"],
   "source": {
     "base": "export interface User {\n  id: string;\n}\n",
     "left": "export interface User {\n  id: string;\n}\n",
@@ -15,6 +16,7 @@
     "decision": "safe",
     "autoMergeable": true,
     "summary": "Adding a new top-level declaration against a no-op sibling is disjoint.",
+    "apply": { "classification": "safe-by-disjoint-region" },
     "merge": {
       "status": "safe-by-disjoint-region",
       "overlappingNodeIds": [],

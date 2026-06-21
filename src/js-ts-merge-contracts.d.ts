@@ -83,6 +83,40 @@ export type JsTsConflictTargetKind =
 
 export type JsTsConflictSide = "base" | "left" | "right" | "merged" | "ancestor" | string;
 
+export type JsTsConflictReasonCode =
+  | "js-ts.stale-source"
+  | "js-ts.dynamic-import"
+  | "js-ts.duplicate-declaration"
+  | "js-ts.duplicate-member"
+  | "js-ts.computed-member"
+  | "js-ts.missing-span"
+  | "js-ts.custom"
+  | (string & {});
+
+export type JsTsConflictSeverity = "info" | "warning" | "error";
+
+export type JsTsMergeAdmissionConflictKeyKind =
+  | "symbol"
+  | "semantic-node"
+  | "region"
+  | "native-span"
+  | "source-preservation"
+  | "source-subtree"
+  | "effect"
+  | "generated-output"
+  | "signature"
+  | "custom";
+
+export type JsTsMergeContractStatus =
+  | "safe"
+  | "unsafe"
+  | "review-required"
+  | "needs-review"
+  | "blocked"
+  | "failed"
+  | "unknown"
+  | string;
+
 export interface JsTsImportSpecifierRecord {
   readonly kind: JsTsImportSpecifierKind;
   readonly importedName?: string;
@@ -275,6 +309,7 @@ export interface JsTsConflictSideRecord {
   readonly side: JsTsConflictSide;
   readonly recordId?: string;
   readonly sourceSpan?: SourceSpan;
+  readonly sourceSpans?: readonly SourceSpan[];
   readonly triviaIds?: readonly string[];
   readonly contentHash?: string;
   readonly conflictKeys?: readonly string[];
@@ -290,14 +325,29 @@ export interface JsTsConflictResolutionRecord {
   readonly metadata?: JsonObject;
 }
 
+export interface JsTsConflictRemediationHint {
+  readonly action: string;
+  readonly target?: string;
+  readonly targetIds: readonly string[];
+  readonly detail?: string;
+  readonly metadata?: JsonObject;
+}
+
 export interface JsTsConflictSidecarInput {
   readonly id?: string;
+  readonly code?: JsTsConflictReasonCode;
+  readonly reasonCode?: JsTsConflictReasonCode;
+  readonly severity?: JsTsConflictSeverity;
   readonly conflictKind?: JsTsConflictKind;
   readonly targetKind?: JsTsConflictTargetKind;
   readonly targetId?: string;
   readonly conflictKeys?: readonly string[];
+  readonly sourceSpan?: SourceSpan;
+  readonly sourceSpans?: readonly SourceSpan[];
+  readonly affectedSpans?: readonly SourceSpan[];
   readonly sides?: readonly JsTsConflictSideRecord[];
   readonly resolution?: JsTsConflictResolutionRecord;
+  readonly remediationHints?: readonly (JsTsConflictRemediationHint | string)[];
   readonly evidenceId?: string;
   readonly evidenceIds?: readonly string[];
   readonly metadata?: JsonObject;
@@ -307,12 +357,18 @@ export interface JsTsConflictSidecarRecord {
   readonly kind: "frontier.lang.jsTsMergeConflictSidecar";
   readonly version: 1;
   readonly id: string;
+  readonly code: JsTsConflictReasonCode;
+  readonly reasonCode: JsTsConflictReasonCode;
+  readonly severity: JsTsConflictSeverity;
   readonly conflictKind: JsTsConflictKind;
   readonly targetKind: JsTsConflictTargetKind;
   readonly targetId?: string;
   readonly conflictKeys: readonly string[];
+  readonly sourceSpans: readonly SourceSpan[];
+  readonly affectedSpans: readonly SourceSpan[];
   readonly sides: readonly JsTsConflictSideRecord[];
   readonly resolution?: JsTsConflictResolutionRecord;
+  readonly remediationHints: readonly JsTsConflictRemediationHint[];
   readonly evidenceIds: readonly string[];
   readonly metadata: JsonObject;
 }
@@ -323,6 +379,20 @@ export interface JsTsMergeContractInput {
   readonly sourcePath?: string;
   readonly sourceHash?: string;
   readonly moduleFormat?: "esm" | "commonjs" | "script" | string;
+  readonly contractKind?: "import" | "declaration" | "member" | string;
+  readonly operationKind?: "import" | "declaration" | "member" | string;
+  readonly safe?: boolean;
+  readonly autoMerge?: boolean;
+  readonly autoMergeable?: boolean;
+  readonly status?: JsTsMergeContractStatus;
+  readonly readiness?: JsTsMergeContractStatus;
+  readonly classification?: JsTsMergeContractStatus;
+  readonly requiredEvidenceIds?: readonly string[];
+  readonly requiredConflictKeyKinds?: readonly JsTsMergeAdmissionConflictKeyKind[];
+  readonly sourcePreservationKey?: string;
+  readonly sourcePreservationKeys?: readonly string[];
+  readonly sourcePreservationConflictKeys?: readonly string[];
+  readonly reasons?: readonly string[];
   readonly sourceSpan?: SourceSpan;
   readonly sourceSpans?: readonly SourceSpan[];
   readonly imports?: readonly (JsTsMergeImportInput | JsTsMergeImportRecord)[];
@@ -346,6 +416,20 @@ export interface JsTsMergeContractRecord {
   readonly sourcePath?: string;
   readonly sourceHash?: string;
   readonly moduleFormat?: "esm" | "commonjs" | "script" | string;
+  readonly contractKind?: "import" | "declaration" | "member" | string;
+  readonly operationKind?: "import" | "declaration" | "member" | string;
+  readonly safe?: boolean;
+  readonly autoMerge?: boolean;
+  readonly autoMergeable?: boolean;
+  readonly status?: JsTsMergeContractStatus;
+  readonly readiness?: JsTsMergeContractStatus;
+  readonly classification?: JsTsMergeContractStatus;
+  readonly requiredEvidenceIds?: readonly string[];
+  readonly requiredConflictKeyKinds?: readonly JsTsMergeAdmissionConflictKeyKind[];
+  readonly sourcePreservationKey?: string;
+  readonly sourcePreservationKeys?: readonly string[];
+  readonly sourcePreservationConflictKeys?: readonly string[];
+  readonly reasons?: readonly string[];
   readonly sourceSpan?: SourceSpan;
   readonly sourceSpans: readonly SourceSpan[];
   readonly imports: readonly JsTsMergeImportRecord[];
@@ -359,6 +443,8 @@ export interface JsTsMergeContractRecord {
 }
 
 export declare const JS_TS_MERGE_CONTRACT_LANGUAGES: readonly ("javascript" | "typescript")[];
+export declare const JS_TS_MERGE_CONFLICT_REASON_CODES: readonly JsTsConflictReasonCode[];
+export declare const JS_TS_MERGE_CONFLICT_SEVERITIES: readonly JsTsConflictSeverity[];
 
 export declare function createJsTsMergeImportRecord(input?: JsTsMergeImportInput): JsTsMergeImportRecord;
 export declare function createJsTsTopLevelDeclarationRecord(input?: JsTsTopLevelDeclarationInput): JsTsTopLevelDeclarationRecord;

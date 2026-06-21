@@ -1,0 +1,44 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-type-alias-add",
+  "title": "Safe type alias add",
+  "language": "typescript",
+  "category": "type-alias",
+  "coverage": ["type-aliases", "safe-declaration-adds"],
+  "source": {
+    "base": "export interface Result {\n  ok: boolean;\n}\n",
+    "left": "export interface Result {\n  ok: boolean;\n}\n",
+    "right": "export interface Result {\n  ok: boolean;\n}\n\nexport type ResultId = `${string}:${number}`;\n"
+  },
+  "expected": {
+    "outcome": "safe-type-alias-add",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "Adding a disjoint exported type alias is a safe top-level declaration add.",
+    "apply": { "classification": "safe-by-disjoint-region" },
+    "merge": {
+      "status": "safe-by-disjoint-region",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": []
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_safe_type_alias_add",
+      "name": "SafeTypeAliasAdd",
+      "nodes": [
+        { "id": "type_result", "kind": "type", "name": "Result", "fields": [{ "id": "field_result_ok", "name": "ok", "type": "Boolean" }] }
+      ]
+    },
+    "leftPatch": { "id": "left_noop_for_type_alias_add", "operations": [] },
+    "rightPatch": {
+      "id": "right_add_result_id_alias",
+      "operations": [
+        { "op": "upsertNode", "node": { "id": "type_result_id", "kind": "type", "name": "ResultId", "fields": [{ "id": "field_result_id_value", "name": "value", "type": "Text" }] } }
+      ]
+    }
+  }
+}

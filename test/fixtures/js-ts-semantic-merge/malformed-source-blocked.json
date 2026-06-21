@@ -1,0 +1,51 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "malformed-source-blocked",
+  "title": "Malformed source blocked",
+  "language": "typescript",
+  "category": "malformed",
+  "coverage": ["malformed-source"],
+  "source": {
+    "base": "export const value = 1;\n",
+    "left": "export const value = ;\n",
+    "right": "export const value = 1;\n"
+  },
+  "expected": {
+    "outcome": "malformed-source-blocked",
+    "decision": "blocked",
+    "autoMergeable": false,
+    "summary": "Malformed source with failed parser evidence is blocked before semantic merge.",
+    "admission": {
+      "classification": "blocked",
+      "reasonIncludes": ["Blocking native loss", "Failed evidence", "Candidate readiness is blocked"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_malformed_const",
+      "language": "typescript",
+      "sourcePath": "src/broken.ts",
+      "touchedSymbols": [],
+      "touchedSemanticNodes": [],
+      "nativeSpans": [],
+      "conflictKeys": [],
+      "readiness": "blocked",
+      "evidence": [
+        { "id": "malformed_parse_check", "kind": "test", "status": "failed", "summary": "Parser rejected missing initializer." }
+      ]
+    },
+    "admissionOptions": {
+      "losses": [
+        {
+          "id": "loss_missing_initializer",
+          "severity": "error",
+          "kind": "parseError",
+          "message": "Expected expression after equals sign.",
+          "span": { "path": "src/broken.ts", "startLine": 1, "startColumn": 22, "endLine": 1, "endColumn": 23 }
+        }
+      ]
+    }
+  }
+}

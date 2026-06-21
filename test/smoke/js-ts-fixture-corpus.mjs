@@ -15,7 +15,30 @@ const requiredOutcomes = new Set([
   'same-name-conflict',
   'safe-member-add',
   'computed-member-conflict',
-  'no-op-roundtrip'
+  'no-op-roundtrip',
+  'comment-trivia-review',
+  'safe-decorator-member',
+  'overload-signature-conflict',
+  'safe-type-alias-add',
+  'safe-object-member-add',
+  'jsx-ish-safe-with-losses',
+  'malformed-source-blocked',
+  'stale-edit-review'
+]);
+const requiredCoverage = new Set([
+  'imports',
+  'comments',
+  'decorators',
+  'overloads',
+  'interfaces',
+  'type-aliases',
+  'object-members',
+  'jsx-ish-source',
+  'malformed-source',
+  'stale-edits',
+  'safe-declaration-adds',
+  'safe-member-adds',
+  'conflicts'
 ]);
 
 const files = (await readdir(fixturesUrl))
@@ -24,6 +47,7 @@ const files = (await readdir(fixturesUrl))
 assert.ok(files.length >= requiredOutcomes.size, 'fixture corpus should include the required JS/TS cases');
 
 const observedOutcomes = new Set();
+const observedCoverage = new Set();
 for (const file of files) {
   const fixtureUrl = new URL(file, fixturesUrl);
   const fileStat = await stat(fixtureUrl);
@@ -44,7 +68,12 @@ for (const file of files) {
   assert.ok(requiredOutcomes.has(fixture.expected?.outcome), `${file} expected outcome should be known`);
   assert.equal(typeof fixture.expected?.summary, 'string', `${file} expected summary`);
   assert.equal(typeof fixture.expected?.autoMergeable, 'boolean', `${file} expected autoMergeable`);
-  assert.ok(['safe', 'review-required', 'conflict'].includes(fixture.expected?.decision), `${file} expected decision`);
+  assert.ok(['safe', 'safe-with-losses', 'review-required', 'conflict', 'blocked'].includes(fixture.expected?.decision), `${file} expected decision`);
+  assert.ok(Array.isArray(fixture.coverage), `${file} coverage tags`);
+  for (const tag of fixture.coverage) {
+    assert.equal(typeof tag, 'string', `${file} coverage tag`);
+    observedCoverage.add(tag);
+  }
   observedOutcomes.add(fixture.expected.outcome);
 
   if (fixture.oracle?.kind === 'semantic-candidate-admission') {
@@ -60,6 +89,9 @@ for (const file of files) {
 
 for (const outcome of requiredOutcomes) {
   assert.ok(observedOutcomes.has(outcome), `missing JS/TS fixture outcome ${outcome}`);
+}
+for (const tag of requiredCoverage) {
+  assert.ok(observedCoverage.has(tag), `missing JS/TS fixture coverage ${tag}`);
 }
 
 function validateSemanticCandidateAdmissionFixture(fixture, file) {
@@ -81,7 +113,8 @@ function validatePatchMergeFixture(fixture, file) {
   const right = createPatch(fixture.oracle.rightPatch);
   const result = classifyMerge(base, left, right);
   const expected = fixture.expected.merge;
-  assert.equal(result.status, expected.status, `${file} merge status`);
+  assert.equal(fixture.expected.apply?.classification, expected.status, `${file} expected apply classification`);
+  assert.equal(result.status, fixture.expected.apply.classification, `${file} merge status`);
   assert.equal(result.autoMergeable, fixture.expected.autoMergeable, `${file} merge autoMergeable`);
   assert.deepEqual(result.overlappingNodeIds, expected.overlappingNodeIds, `${file} overlapping nodes`);
   assert.deepEqual(result.overlappingRegions, expected.overlappingRegions, `${file} overlapping regions`);

@@ -42,11 +42,13 @@
     ],
     "allowedOversizedFiles": {
       "src/decision-graph-records.d.ts": {
-        "maxLines": 360,
+        "maxLines": 720,
+        "maxChars": 30000,
         "reason": "Typed decision graph record contracts are intentionally grouped so graph consumers get one stable data surface."
       },
       "src/decision-graph-records.js": {
-        "maxLines": 420,
+        "maxLines": 860,
+        "maxChars": 36000,
         "reason": "Typed decision graph record constructors are intentionally grouped with their shared normalization helpers."
       },
       "src/js-ts-declarations.js": {
@@ -54,25 +56,52 @@
         "reason": "Dependency-free JS/TS declaration scanner keeps tokenization and merge classification in one parser unit."
       },
       "src/js-ts-merge-contracts.d.ts": {
-        "maxLines": 400,
+        "maxLines": 480,
         "reason": "JS/TS merge contract records are intentionally grouped as one public contract surface."
       },
       "src/js-ts-merge-contracts.js": {
-        "maxLines": 360,
+        "maxLines": 520,
         "reason": "JS/TS merge contract constructors are intentionally grouped with their shared conflict-key helpers."
       },
+      "src/js-ts-safe-declaration-merge.js": {
+        "maxLines": 620,
+        "reason": "JS/TS safe top-level declaration merge keeps declaration slicing, conflict checks, and deterministic replay helpers together."
+      },
+      "src/js-ts-safe-import-merge.js": {
+        "maxLines": 760,
+        "reason": "JS/TS safe import merge keeps import tokenization, identity keys, and deterministic source insertion helpers together."
+      },
+      "src/js-ts-safe-member-merge.js": {
+        "maxLines": 1320,
+        "maxChars": 40000,
+        "reason": "JS/TS safe member merge handles interface, type literal, class, and object member regions in one dependency-free parser unit."
+      },
+      "src/js-ts-safe-merge-apply.js": {
+        "maxLines": 400,
+        "reason": "JS/TS safe merge apply records keep terminal admission decisions and evidence normalization together."
+      },
       "src/semantic-merge-admission.js": {
-        "maxLines": 1100,
-        "maxChars": 42000,
-        "reason": "Semantic merge admission coordinates contract, sidecar, and conflict classification in one admission unit."
+        "maxLines": 1320,
+        "maxChars": 54000,
+        "reason": "Semantic merge admission coordinates contract sidecars, apply gates, and conflict classification in one admission unit."
       },
       "src/source-roundtrip.js": {
-        "maxLines": 720,
+        "maxLines": 1280,
+        "maxChars": 42000,
         "reason": "No-op source roundtrip scanner keeps lexical scanning, reconstruction, and feature summarization together."
       },
       "src/source-trivia-ledger.js": {
-        "maxLines": 780,
+        "maxLines": 1720,
+        "maxChars": 56000,
         "reason": "Source span/trivia ledger keeps source scanning and deterministic conflict-key generation together."
+      },
+      "test/smoke/decision-graph-records.mjs": {
+        "maxLines": 380,
+        "reason": "Decision graph smoke coverage keeps linked node, edge, admission, tournament, replay, and RSI assertions together."
+      },
+      "test/smoke/semantic-merge-admission.mjs": {
+        "maxLines": 450,
+        "reason": "Semantic merge admission smoke coverage keeps safe, lossy, sidecar conflict, and apply-gate cases together."
       }
     }
   }

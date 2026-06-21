@@ -3,6 +3,32 @@ export const JS_TS_MERGE_CONTRACT_LANGUAGES = Object.freeze([
   "typescript"
 ]);
 
+export const JS_TS_MERGE_CONFLICT_REASON_CODES = Object.freeze([
+  "js-ts.stale-source",
+  "js-ts.dynamic-import",
+  "js-ts.duplicate-declaration",
+  "js-ts.duplicate-member",
+  "js-ts.computed-member",
+  "js-ts.missing-span",
+  "js-ts.custom"
+]);
+
+export const JS_TS_MERGE_CONFLICT_SEVERITIES = Object.freeze([
+  "info",
+  "warning",
+  "error"
+]);
+
+const JS_TS_MERGE_CONFLICT_DEFAULT_SEVERITY = Object.freeze({
+  "js-ts.stale-source": "error",
+  "js-ts.dynamic-import": "warning",
+  "js-ts.duplicate-declaration": "error",
+  "js-ts.duplicate-member": "error",
+  "js-ts.computed-member": "warning",
+  "js-ts.missing-span": "warning",
+  "js-ts.custom": "warning"
+});
+
 export function createJsTsMergeImportRecord(input = {}) {
   const specifiers = input.specifiers ?? [];
   const attributes = input.attributes ?? [];
@@ -117,14 +143,30 @@ export function createJsTsTriviaRecord(input = {}) {
 }
 
 export function createJsTsConflictSidecarRecord(input = {}) {
-  const sides = input.sides ?? [];
+  const sides = (input.sides ?? []).map((side, index) => normalizeJsTsConflictSide(side, index));
+  const code = normalizeJsTsConflictReasonCode(input.code ?? input.reasonCode ?? inferJsTsConflictReasonCode(input));
+  const severity = normalizeJsTsConflictSeverity(input.severity, code);
+  const affectedSpans = uniqueSourceSpans(
+    input.affectedSpans,
+    input.sourceSpans,
+    input.sourceSpan,
+    sides.flatMap((side) => side.sourceSpans ?? [])
+  );
   const evidenceIds = uniqueStrings(input.evidenceIds, input.evidenceId);
+  const remediationHints = normalizeJsTsRemediationHints(
+    input.remediationHints ?? defaultJsTsRemediationHints({ code, targetKind: input.targetKind, targetId: input.targetId, sides })
+  );
   const record = {
     ...input,
     id: input.id ?? jsTsConflictSidecarId(input),
+    code,
+    reasonCode: code,
+    severity,
     conflictKind: input.conflictKind ?? "custom",
     targetKind: input.targetKind ?? "contract",
     sides,
+    affectedSpans,
+    sourceSpans: affectedSpans,
     evidenceIds
   };
   return {
@@ -135,6 +177,7 @@ export function createJsTsConflictSidecarRecord(input = {}) {
       defaultJsTsConflictSidecarKey(record),
       sides.flatMap((side) => side?.conflictKeys ?? [])
     ),
+    remediationHints,
     metadata: input.metadata ?? {}
   };
 }
@@ -278,11 +321,142 @@ function specifierSummary(specifiers) {
   return names.length > 0 ? names.join(",") : "side-effect";
 }
 
+function normalizeJsTsConflictSide(side = {}, index = 0) {
+  const sourceSpans = sourceSpanList(side.sourceSpans, side.sourceSpan);
+  return {
+    ...side,
+    side: normalizeJsTsConflictSideIdentity(side.side, index),
+    sourceSpans,
+    conflictKeys: uniqueStrings(side.conflictKeys),
+    triviaIds: uniqueStrings(side.triviaIds, side.leadingTriviaIds, side.trailingTriviaIds),
+    metadata: side.metadata ?? {}
+  };
+}
+
+function normalizeJsTsConflictSideIdentity(side, index) {
+  if (typeof side === "string" && side.length > 0) {
+    return side;
+  }
+  return `side-${index + 1}`;
+}
+
+function inferJsTsConflictReasonCode(input) {
+  const conflictKind = typeof input.conflictKind === "string" ? input.conflictKind : "";
+  const targetKind = typeof input.targetKind === "string" ? input.targetKind : "";
+  const kind = `${conflictKind}:${targetKind}`;
+  if (input.staleSource === true || conflictKind === "stale-source" || input.metadata?.staleSource === true) {
+    return "js-ts.stale-source";
+  }
+  if (input.dynamic === true || conflictKind === "dynamic-import" || kind === "import:dynamic" || input.metadata?.dynamic === true) {
+    return "js-ts.dynamic-import";
+  }
+  if (conflictKind === "duplicate-declaration" || conflictKind === "same-name-declaration") {
+    return "js-ts.duplicate-declaration";
+  }
+  if (conflictKind === "duplicate-member" || conflictKind === "same-name-member") {
+    return "js-ts.duplicate-member";
+  }
+  if (input.computed === true || conflictKind === "computed-member" || input.metadata?.computed === true) {
+    return "js-ts.computed-member";
+  }
+  if (conflictKind === "missing-span" || targetKind === "sourceSpan" || input.metadata?.missingSpan === true) {
+    return "js-ts.missing-span";
+  }
+  return "js-ts.custom";
+}
+
+function normalizeJsTsConflictReasonCode(code) {
+  return typeof code === "string" && code.length > 0 ? code : "js-ts.custom";
+}
+
+function normalizeJsTsConflictSeverity(severity, code) {
+  if (JS_TS_MERGE_CONFLICT_SEVERITIES.includes(severity)) {
+    return severity;
+  }
+  return JS_TS_MERGE_CONFLICT_DEFAULT_SEVERITY[code] ?? "warning";
+}
+
+function defaultJsTsRemediationHints(input) {
+  const targetKind = input.targetKind ?? "contract";
+  const targetIds = uniqueStrings(input.targetId, input.sides?.map((side) => side.recordId));
+  if (input.code === "js-ts.stale-source") {
+    return [{ action: "refresh-source", target: targetKind, targetIds }];
+  }
+  if (input.code === "js-ts.dynamic-import") {
+    return [{ action: "manual-review", target: "import", targetIds }];
+  }
+  if (input.code === "js-ts.duplicate-declaration") {
+    return [{ action: "rename-or-merge-declaration", target: "topLevelDeclaration", targetIds }];
+  }
+  if (input.code === "js-ts.duplicate-member") {
+    return [{ action: "rename-or-merge-member", target: "member", targetIds }];
+  }
+  if (input.code === "js-ts.computed-member") {
+    return [{ action: "manual-review", target: "member", targetIds }];
+  }
+  if (input.code === "js-ts.missing-span") {
+    return [{ action: "add-source-span", target: targetKind, targetIds }];
+  }
+  return [{ action: "manual-review", target: targetKind, targetIds }];
+}
+
+function normalizeJsTsRemediationHints(hints) {
+  return (hints ?? []).map((hint) => {
+    if (typeof hint === "string") {
+      return { action: hint, targetIds: [] };
+    }
+    const action = typeof hint?.action === "string" && hint.action.length > 0 ? hint.action : "manual-review";
+    return {
+      action,
+      ...(typeof hint?.target === "string" ? { target: hint.target } : {}),
+      targetIds: uniqueStrings(hint?.targetIds),
+      ...(typeof hint?.detail === "string" ? { detail: hint.detail } : {}),
+      ...(hint?.metadata && typeof hint.metadata === "object" ? { metadata: hint.metadata } : {})
+    };
+  }).sort((left, right) => remediationHintKey(left).localeCompare(remediationHintKey(right)));
+}
+
+function remediationHintKey(hint) {
+  return [
+    hint.action,
+    hint.target ?? "",
+    hint.targetIds.join("\u0000"),
+    hint.detail ?? ""
+  ].join("\u0001");
+}
+
 function sourceSpanList(sourceSpans, sourceSpan) {
   if (Array.isArray(sourceSpans)) {
     return sourceSpans;
   }
   return sourceSpan ? [sourceSpan] : [];
+}
+
+function uniqueSourceSpans(...values) {
+  const result = [];
+  const seen = new Set();
+  for (const value of values) {
+    collectSourceSpans(value, result, seen);
+  }
+  return result;
+}
+
+function collectSourceSpans(value, result, seen) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectSourceSpans(item, result, seen);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  const key = spanKey(value);
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  result.push(value);
 }
 
 function spanKey(span) {

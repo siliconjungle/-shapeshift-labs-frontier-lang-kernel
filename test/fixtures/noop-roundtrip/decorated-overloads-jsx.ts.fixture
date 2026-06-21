@@ -1,0 +1,36 @@
+// Decorators, overloads, object literals, and JSX-like text stay byte-stable.
+import { Panel } from "./ui.js";
+import type { RenderContext } from "./types.js";
+
+export type RenderNode = {
+  readonly id: string;
+  kind: "panel";
+};
+
+export interface Renderer {
+  render(input: string): RenderNode;
+  render(input: RenderContext): RenderNode;
+}
+
+@sealed
+export class PanelRenderer implements Renderer {
+  static defaults = {
+    role: "region",
+    retries: 2
+  };
+
+  render(input: string | RenderContext): RenderNode {
+    const title = typeof input === "string" ? input : input.title;
+    const props = {
+      ...PanelRenderer.defaults,
+      title
+    };
+    const preview = `<Panel title={title} role="${props.role}" />`;
+    return {
+      id: `${title}:${props.retries}`,
+      kind: "panel"
+    };
+  }
+}
+
+export const jsxish = (title: string) => <Panel title={title} />;

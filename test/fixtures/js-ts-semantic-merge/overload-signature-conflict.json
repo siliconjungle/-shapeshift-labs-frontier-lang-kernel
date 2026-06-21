@@ -1,0 +1,50 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "overload-signature-conflict",
+  "title": "Overload signature conflict",
+  "language": "typescript",
+  "category": "overload",
+  "coverage": ["overloads", "conflicts"],
+  "source": {
+    "base": "export function parse(input: string): Ast;\nexport function parse(input: string) {\n  return build(input);\n}\n",
+    "left": "export function parse(input: URL): Ast;\nexport function parse(input: string): Ast;\nexport function parse(input: string) {\n  return build(input);\n}\n",
+    "right": "export function parse(input: Buffer): Ast;\nexport function parse(input: string): Ast;\nexport function parse(input: string) {\n  return build(input);\n}\n"
+  },
+  "expected": {
+    "outcome": "overload-signature-conflict",
+    "decision": "conflict",
+    "autoMergeable": false,
+    "summary": "Both branches add competing overloads to the same signature set.",
+    "apply": { "classification": "conflict-by-overlap" },
+    "merge": {
+      "status": "conflict-by-overlap",
+      "overlappingNodeIds": [],
+      "overlappingRegions": ["parse.overloads"],
+      "overlappingEffects": [],
+      "reasonIncludes": ["same semantic node or region"]
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_overload_signature_conflict",
+      "name": "OverloadSignatureConflict",
+      "nodes": [
+        { "id": "type_parser", "kind": "type", "name": "Parser", "fields": [{ "id": "field_parse", "name": "parse", "type": "Function" }] }
+      ]
+    },
+    "leftPatch": {
+      "id": "left_add_url_overload",
+      "operations": [
+        { "op": "addEvidence", "evidence": { "id": "left_url_overload_scan", "kind": "test", "status": "passed" }, "touches": [{ "id": "parse.overloads", "access": "write" }] }
+      ]
+    },
+    "rightPatch": {
+      "id": "right_add_buffer_overload",
+      "operations": [
+        { "op": "addEvidence", "evidence": { "id": "right_buffer_overload_scan", "kind": "test", "status": "passed" }, "touches": [{ "id": "parse.overloads", "access": "write" }] }
+      ]
+    }
+  }
+}

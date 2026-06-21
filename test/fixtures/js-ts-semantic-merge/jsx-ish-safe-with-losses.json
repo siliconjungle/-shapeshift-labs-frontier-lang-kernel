@@ -1,0 +1,69 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "jsx-ish-safe-with-losses",
+  "title": "JSX-ish source safe with losses",
+  "language": "typescript",
+  "category": "jsx-ish",
+  "coverage": ["jsx-ish-source"],
+  "source": {
+    "base": "export const view = (title: string) => <Panel title={title} />;\n",
+    "left": "export const view = (title: string) => <Panel title={title} tone=\"info\" />;\n",
+    "right": "export const view = (title: string) => <Panel title={title} />;\n"
+  },
+  "expected": {
+    "outcome": "jsx-ish-safe-with-losses",
+    "decision": "safe-with-losses",
+    "autoMergeable": false,
+    "summary": "JSX-like native text can be source-preserved, but a non-blocking loss prevents auto-merge.",
+    "admission": {
+      "classification": "safe-with-losses",
+      "includesConflictKeyKinds": ["symbol", "semantic-node", "native-span", "source-preservation", "signature"],
+      "reasonIncludes": ["Non-blocking loss"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_jsx_panel_prop",
+      "language": "typescript",
+      "sourcePath": "src/view.tsx",
+      "touchedSymbols": [
+        { "id": "symbol:view", "name": "view", "kind": "function", "semanticNodeId": "fn_view", "nativeAstNodeId": "native_view_arrow", "conflictKey": "symbol:symbol:view" }
+      ],
+      "touchedSemanticNodes": [
+        { "id": "fn_view", "kind": "view", "name": "view", "conflictKey": "node:fn_view" }
+      ],
+      "nativeSpans": [
+        {
+          "id": "span_jsx_panel",
+          "nativeAstNodeId": "native_jsx_panel",
+          "semanticNodeId": "fn_view",
+          "symbolId": "symbol:view",
+          "span": { "path": "src/view.tsx", "startLine": 1, "startColumn": 40, "endLine": 1, "endColumn": 74 },
+          "conflictKey": "native:src/view.tsx:1:40:1:74:native_jsx_panel"
+        }
+      ],
+      "conflictKeys": [
+        "source-preservation:map_view:jsx:expression:symbol%3Aview",
+        "sig:typescript:symbol:view:fnv1a32:jsx-prop"
+      ],
+      "readiness": "ready-with-losses",
+      "evidence": [
+        { "id": "jsx_native_text_scan", "kind": "test", "status": "passed" }
+      ]
+    },
+    "admissionOptions": {
+      "losses": [
+        {
+          "id": "loss_jsx_native_projection",
+          "severity": "warning",
+          "kind": "unsupportedSyntax",
+          "message": "JSX expression retained as source-preserved native text.",
+          "span": { "path": "src/view.tsx", "startLine": 1, "startColumn": 40, "endLine": 1, "endColumn": 74 },
+          "semanticSymbolId": "symbol:view"
+        }
+      ]
+    }
+  }
+}

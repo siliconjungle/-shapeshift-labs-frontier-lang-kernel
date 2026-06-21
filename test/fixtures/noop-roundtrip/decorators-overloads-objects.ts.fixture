@@ -1,0 +1,42 @@
+/* Decorators, overloads, type aliases, and objects should survive no-op scans. */
+import type { FieldResolver } from "./decorators.js";
+import { tracked } from "./decorators.js";
+
+function sealed(value: Function) {
+  return value;
+}
+
+export interface Repository<T> {
+  find(id: string): T | undefined;
+  find(id: number): T | undefined;
+}
+
+export type RepositoryOptions<T extends object = { id: string }> = {
+  readonly cache: boolean;
+  readonly resolver?: FieldResolver<T>;
+};
+
+const defaults = {
+  cache: true,
+  nested: {
+    mode: "readonly"
+  }
+};
+
+export function normalize(value: string): string;
+export function normalize(value: number): string;
+export function normalize(value: string | number): string {
+  return String(value);
+}
+
+@sealed
+export class Store<T extends { id: string }> {
+  @tracked("items")
+  items: T[] = [];
+
+  lookup(id: string): T | undefined;
+  lookup(id: number): T | undefined;
+  lookup(id: string | number): T | undefined {
+    return this.items.find((item) => item.id === String(id));
+  }
+}

@@ -1,5 +1,11 @@
 import type { EvidenceRecord } from "./evidence.js";
+import type {
+  JsTsConflictReasonCode,
+  JsTsConflictSidecarInput,
+  JsTsConflictSidecarRecord
+} from "./js-ts-merge-contracts.js";
 import type { JsonObject, SourceSpan } from "./base.js";
+import type { JsTsSafeMergeApplyInput, JsTsSafeMergeApplyRecord } from "./js-ts-safe-merge.js";
 import type { SemanticMergeCandidateRecord, SemanticMergeReadiness } from "./merge-candidates.js";
 import type { NativeAstLossRecord, NativeAstRecord, SemanticIndexRecord } from "./source-records.js";
 import type { SourceMapGeneratedSpan, SourceMapMappingRecord, SourceMapRecord, SourcePreservationRecord } from "./source-maps.js";
@@ -46,7 +52,12 @@ export type SemanticMergeConflictReasonCode =
   | "semantic-merge.readiness-review"
   | "semantic-merge.non-blocking-loss"
   | "semantic-merge.competing-candidate"
+  | "semantic-merge.apply-gate-blocked-evidence"
+  | "semantic-merge.apply-gate-stale"
+  | "semantic-merge.apply-gate-no-op"
+  | "semantic-merge.apply-gate-review"
   | "semantic-merge.external-conflict"
+  | JsTsConflictReasonCode
   | (string & {});
 
 export interface SemanticMergeConflictCandidateRef {
@@ -124,6 +135,8 @@ export interface SemanticMergeContractRecord {
   readonly sourcePreservationKey?: string;
   readonly sourcePreservationKeys?: readonly string[];
   readonly sourcePreservationConflictKeys?: readonly string[];
+  readonly conflictSidecars?: readonly (JsTsConflictSidecarInput | JsTsConflictSidecarRecord)[];
+  readonly conflicts?: readonly (JsTsConflictSidecarInput | JsTsConflictSidecarRecord)[];
   readonly reasons?: readonly string[];
   readonly metadata?: JsonObject;
 }
@@ -153,6 +166,12 @@ export interface SemanticMergeAdmissionOptions extends SemanticMergeAdmissionCon
   readonly opaque?: boolean;
   readonly conflicts?: readonly SemanticMergeConflictSidecarInput[];
   readonly competingCandidates?: readonly SemanticMergeCandidateRecord[];
+  readonly jsTsSafeMergeApplyRecord?: JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord;
+  readonly jsTsSafeMergeApplyRecords?: readonly (JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord)[];
+  readonly safeMergeApplyRecord?: JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord;
+  readonly safeMergeApplyRecords?: readonly (JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord)[];
+  readonly applyGate?: JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord;
+  readonly applyGates?: readonly (JsTsSafeMergeApplyInput | JsTsSafeMergeApplyRecord)[];
   readonly metadata?: JsonObject;
 }
 

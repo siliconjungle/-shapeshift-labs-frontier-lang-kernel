@@ -1,0 +1,68 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-decorator-member",
+  "title": "Safe decorator member add",
+  "language": "typescript",
+  "category": "decorator",
+  "coverage": ["decorators", "safe-member-adds"],
+  "source": {
+    "base": "export class Service {\n  run() {\n    return 'ok';\n  }\n}\n",
+    "left": "export class Service {\n  @trace\n  run() {\n    return 'ok';\n  }\n}\n",
+    "right": "export class Service {\n  run() {\n    return 'ok';\n  }\n}\n"
+  },
+  "expected": {
+    "outcome": "safe-decorator-member",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "A member decorator with stable symbol, region, native span, and source-preservation keys is admissible.",
+    "admission": {
+      "classification": "safe",
+      "includesConflictKeyKinds": ["symbol", "semantic-node", "region", "native-span", "source-preservation", "signature"],
+      "reasonIncludes": ["contract_decorator_member", "Stable conflict keys cover"]
+    }
+  },
+  "oracle": {
+    "kind": "semantic-candidate-admission",
+    "candidate": {
+      "id": "candidate_decorator_trace_run",
+      "language": "typescript",
+      "sourcePath": "src/service.ts",
+      "touchedSymbols": [
+        { "id": "symbol:trace", "name": "trace", "kind": "decorator", "semanticNodeId": "member_run", "nativeAstNodeId": "native_run_decorator", "conflictKey": "symbol:symbol:trace" }
+      ],
+      "touchedSemanticNodes": [
+        { "id": "member_run", "kind": "member", "name": "run", "conflictKey": "node:member_run" }
+      ],
+      "nativeSpans": [
+        {
+          "id": "span_run_decorator",
+          "nativeAstNodeId": "native_run_decorator",
+          "semanticNodeId": "member_run",
+          "symbolId": "symbol:trace",
+          "span": { "path": "src/service.ts", "startLine": 2, "startColumn": 3, "endLine": 2, "endColumn": 9 },
+          "conflictKey": "native:src/service.ts:2:3:2:9:native_run_decorator"
+        }
+      ],
+      "conflictKeys": [
+        "region:Service.run",
+        "source-preservation:map_service:decorator:declaration:symbol%3Atrace",
+        "sig:typescript:symbol:trace:fnv1a32:decorator"
+      ],
+      "readiness": "ready",
+      "reasons": ["Decorator text is anchored to the run member."],
+      "evidence": [
+        { "id": "decorator_member_scan", "kind": "test", "status": "passed" }
+      ],
+      "metadata": {
+        "semanticMergeContract": {
+          "id": "contract_decorator_member",
+          "kind": "member",
+          "language": "typescript",
+          "safe": true,
+          "requiredEvidenceIds": ["decorator_member_scan"]
+        }
+      }
+    }
+  }
+}

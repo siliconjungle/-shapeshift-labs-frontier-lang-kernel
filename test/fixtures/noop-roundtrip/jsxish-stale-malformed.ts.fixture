@@ -1,0 +1,20 @@
+/* JSX-ish and stale snippets are still byte-preserving no-op roundtrip inputs. */
+import { Panel } from "./view.js";
+
+const state = {
+  title: "demo",
+  count: 2
+};
+
+export const view = <Panel title={state.title}>
+  <span>{state.count}</span>
+</Panel>;
+
+// stale-conflict-marker: left branch begins
+const branch = { value: "left" };
+// stale-conflict-marker: branch divider
+const branch = { value: "right" };
+// stale-conflict-marker: right branch ends
+
+export function unfinished(value: string) {
+  return branch.value + value;

@@ -5,6 +5,7 @@
   "title": "Computed member conflict",
   "language": "typescript",
   "category": "member",
+  "coverage": ["object-members", "conflicts"],
   "source": {
     "base": "export class Profile {\n  first = '';\n  last = '';\n  get fullName() {\n    return this.first;\n  }\n}\n",
     "left": "export class Profile {\n  first = '';\n  last = '';\n  get fullName() {\n    return `${this.first} ${this.last}`;\n  }\n}\n",
@@ -15,6 +16,7 @@
     "decision": "conflict",
     "autoMergeable": false,
     "summary": "Both branches rewrite the same computed accessor body.",
+    "apply": { "classification": "conflict-by-overlap" },
     "merge": {
       "status": "conflict-by-overlap",
       "overlappingNodeIds": [],

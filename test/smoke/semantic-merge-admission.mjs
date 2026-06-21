@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import {
+  JS_TS_MERGE_CONFLICT_REASON_CODES,
   classifySemanticMergeCandidate,
-  collectSemanticMergeAdmissionConflictKeys
+  collectSemanticMergeAdmissionConflictKeys,
+  createJsTsMergeContractRecord,
+  createJsTsSafeMergeApplyRecord
 } from '../../dist/index.js';
 import { createUniversalAstFixture } from './universal-fixture.mjs';
 
@@ -54,6 +57,211 @@ assert.equal(safeAdmission.metadata.jsTsMergeContracts[0].classification, 'safe'
 assert.deepEqual(safeAdmission.conflicts, []);
 assert.match(safeAdmission.reasons.join('\n'), /Stable conflict keys cover/);
 assert.match(safeAdmission.reasons.join('\n'), /contract_safe_member/);
+assert.equal(JS_TS_MERGE_CONFLICT_REASON_CODES.includes('js-ts.duplicate-member'), true);
+
+const structuredConflictContract = createJsTsMergeContractRecord({
+  id: 'contract_structured_duplicate_member',
+  contractKind: 'member',
+  language: 'typescript',
+  sourcePath: 'src/todo.ts',
+  safe: true,
+  requiredEvidenceIds: ['safe_merge_admission'],
+  conflictSidecars: [{
+    code: 'js-ts.duplicate-member',
+    conflictKind: 'duplicate-member',
+    targetKind: 'member',
+    targetId: 'member_title',
+    sides: [
+      {
+        side: 'left',
+        recordId: 'member_title',
+        sourceSpan: { path: 'src/todo.ts', startLine: 4, startColumn: 3, endLine: 4, endColumn: 17 },
+        payload: { type: 'string' }
+      },
+      {
+        side: 'right',
+        recordId: 'member_title',
+        sourceSpan: { path: 'src/todo.ts', startLine: 4, startColumn: 3, endLine: 4, endColumn: 17 },
+        payload: { type: 'Text' }
+      }
+    ]
+  }]
+});
+const structuredSidecarAdmission = classifySemanticMergeCandidate({
+  candidate: safeCandidate,
+  mergeContracts: [structuredConflictContract]
+});
+assert.equal(structuredSidecarAdmission.classification, 'blocked');
+const structuredAdmissionConflict = structuredSidecarAdmission.conflicts.find((conflict) => conflict.code === 'js-ts.duplicate-member');
+assert.equal(structuredAdmissionConflict.severity, 'error');
+assert.equal(structuredAdmissionConflict.affectedContractIds.includes('contract_structured_duplicate_member'), true);
+assert.equal(structuredAdmissionConflict.affectedContractIds.includes('member_title'), true);
+assert.equal(structuredAdmissionConflict.sourceSpans[0].path, 'src/todo.ts');
+assert.equal(structuredAdmissionConflict.remediationHints[0].action, 'rename-or-merge-member');
+assert.equal(structuredAdmissionConflict.metadata.jsTsMergeContractId, 'contract_structured_duplicate_member');
+assert.deepEqual(structuredAdmissionConflict.metadata.jsTsConflictSideIdentities, ['left', 'right']);
+assert.equal(structuredAdmissionConflict.metadata.jsTsConflictSidecar.sides[1].payload.type, 'Text');
+const structuredContractMetadata = structuredSidecarAdmission.metadata.jsTsMergeContracts
+  .find((contract) => contract.id === 'contract_structured_duplicate_member');
+assert.equal(structuredContractMetadata.conflictSidecars[0].code, 'js-ts.duplicate-member');
+assert.equal(structuredContractMetadata.conflictSidecars[0].affectedSpans[0].path, 'src/todo.ts');
+assert.match(structuredSidecarAdmission.reasons.join('\n'), /duplicate member conflict/);
+
+const safeApplyInput = {
+  id: 'apply_safe_member',
+  language: 'typescript',
+  sourcePath: 'src/todo.ts',
+  safeCaseKind: 'member',
+  changed: true,
+  operationCount: 1,
+  baseHash: 'fnv1a32:base',
+  currentBaseHash: 'fnv1a32:base',
+  targetHash: 'fnv1a32:target',
+  contractIds: ['contract_safe_member'],
+  requiredEvidenceIds: ['safe_merge_admission']
+};
+const directSafeApply = createJsTsSafeMergeApplyRecord({
+  ...safeApplyInput,
+  candidateId: safeCandidate.id,
+  language: 'typescript',
+  sourcePath: 'src/todo.ts',
+  conflictKeys: safeConflictKeys,
+  evidence: safeCandidate.evidence
+});
+assert.equal(directSafeApply.kind, 'frontier.lang.jsTsSafeMergeApply');
+assert.equal(directSafeApply.classification, 'safe-apply');
+assert.equal(directSafeApply.decision, 'accept');
+assert.equal(directSafeApply.autoApplyable, true);
+assert.equal(directSafeApply.noOp, false);
+assert.deepEqual(directSafeApply.passedEvidenceIds, ['safe_merge_admission']);
+
+const safeApplyAdmission = classifySemanticMergeCandidate({
+  candidate: {
+    ...safeCandidate,
+    id: 'merge_projection_safe_apply',
+    metadata: {
+      semanticMergeContract: safeContract,
+      jsTsSafeMergeApplyRecord: safeApplyInput
+    }
+  },
+  requiredConflictKeyKinds: ['symbol', 'region', 'native-span', 'source-preservation', 'source-subtree', 'generated-output', 'signature']
+});
+assert.equal(safeApplyAdmission.classification, 'safe');
+assert.equal(safeApplyAdmission.autoMergeable, true);
+assert.equal(safeApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].classification, 'safe-apply');
+assert.equal(safeApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].decision, 'accept');
+assert.equal(safeApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].autoApplyable, true);
+assert.equal(safeApplyAdmission.metadata.jsTsSafeMergeApplySummary.decisions.accept, 1);
+assert.match(safeApplyAdmission.reasons.join('\n'), /apply_safe_member accepts member changes/);
+
+const noOpApplyAdmission = classifySemanticMergeCandidate({
+  candidate: {
+    ...safeCandidate,
+    id: 'merge_projection_apply_noop',
+    metadata: {
+      semanticMergeContract: safeContract,
+      jsTsSafeMergeApplyRecord: {
+        ...safeApplyInput,
+        id: 'apply_noop_member',
+        changed: false,
+        operationCount: 0
+      }
+    }
+  },
+  requiredConflictKeyKinds: ['symbol', 'region', 'native-span', 'source-preservation', 'source-subtree', 'generated-output', 'signature']
+});
+assert.equal(noOpApplyAdmission.classification, 'blocked');
+assert.equal(noOpApplyAdmission.autoMergeable, false);
+assert.equal(noOpApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].classification, 'no-op');
+assert.equal(noOpApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].decision, 'reject');
+assert.equal(
+  noOpApplyAdmission.conflicts.some((conflict) => conflict.code === 'semantic-merge.apply-gate-no-op'),
+  true
+);
+assert.match(noOpApplyAdmission.reasons.join('\n'), /no source or semantic change/);
+
+const staleApplyAdmission = classifySemanticMergeCandidate({
+  candidate: {
+    ...safeCandidate,
+    id: 'merge_projection_apply_stale',
+    metadata: {
+      semanticMergeContract: safeContract,
+      jsTsSafeMergeApplyRecord: {
+        ...safeApplyInput,
+        id: 'apply_stale_member',
+        baseHash: 'fnv1a32:old',
+        currentBaseHash: 'fnv1a32:new'
+      }
+    }
+  },
+  requiredConflictKeyKinds: ['symbol', 'region', 'native-span', 'source-preservation', 'source-subtree', 'generated-output', 'signature']
+});
+assert.equal(staleApplyAdmission.classification, 'blocked');
+assert.equal(staleApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].classification, 'stale');
+assert.equal(staleApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].decision, 'reject');
+assert.equal(
+  staleApplyAdmission.conflicts.some((conflict) => conflict.code === 'semantic-merge.apply-gate-stale' && conflict.severity === 'error'),
+  true
+);
+assert.match(staleApplyAdmission.reasons.join('\n'), /expected base fnv1a32:old, current base fnv1a32:new/);
+
+const conflictApplyAdmission = classifySemanticMergeCandidate({
+  candidate: {
+    ...safeCandidate,
+    id: 'merge_projection_apply_conflict',
+    metadata: {
+      semanticMergeContract: safeContract,
+      jsTsSafeMergeApplyRecord: {
+        ...safeApplyInput,
+        id: 'apply_conflict_member',
+        conflicts: [{
+          id: 'member_signature_conflict',
+          conflictKeys: ['node:ent_todo'],
+          reason: 'Member signature differs from the queued apply record.'
+        }]
+      }
+    }
+  },
+  requiredConflictKeyKinds: ['symbol', 'region', 'native-span', 'source-preservation', 'source-subtree', 'generated-output', 'signature']
+});
+assert.equal(conflictApplyAdmission.classification, 'review-required');
+assert.equal(conflictApplyAdmission.autoMergeable, false);
+assert.equal(conflictApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].classification, 'review-required');
+assert.equal(conflictApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].decision, 'review');
+assert.equal(
+  conflictApplyAdmission.conflicts.some((conflict) => conflict.code === 'semantic-merge.apply-gate-review'),
+  true
+);
+assert.match(conflictApplyAdmission.reasons.join('\n'), /unresolved conflict metadata/);
+
+const blockedEvidenceApplyAdmission = classifySemanticMergeCandidate({
+  candidate: {
+    ...safeCandidate,
+    id: 'merge_projection_apply_blocked_evidence',
+    metadata: {
+      semanticMergeContract: safeContract,
+      jsTsSafeMergeApplyRecord: {
+        ...safeApplyInput,
+        id: 'apply_blocked_evidence_member',
+        requiredEvidenceIds: ['apply_gate_check'],
+        evidence: [{ id: 'apply_gate_check', kind: 'test', status: 'failed' }]
+      }
+    }
+  },
+  requiredConflictKeyKinds: ['symbol', 'region', 'native-span', 'source-preservation', 'source-subtree', 'generated-output', 'signature']
+});
+assert.equal(blockedEvidenceApplyAdmission.classification, 'blocked');
+assert.equal(blockedEvidenceApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].classification, 'blocked-evidence');
+assert.equal(blockedEvidenceApplyAdmission.metadata.jsTsSafeMergeApplyRecords[0].decision, 'block');
+assert.equal(blockedEvidenceApplyAdmission.evidence.some((record) => record.id === 'apply_gate_check'), true);
+assert.equal(
+  blockedEvidenceApplyAdmission.conflicts.some((conflict) => conflict.code === 'semantic-merge.apply-gate-blocked-evidence'),
+  true
+);
+assert.equal(
+  blockedEvidenceApplyAdmission.conflicts.some((conflict) => conflict.code === 'semantic-merge.failed-evidence'),
+  true
+);
 
 const safeWithLossesAdmission = classifySemanticMergeCandidate({
   candidate: { ...safeCandidate, id: 'merge_projection_lossy', readiness: 'ready-with-losses' },

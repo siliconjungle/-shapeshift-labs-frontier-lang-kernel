@@ -5,6 +5,7 @@
   "title": "Unsafe dynamic import",
   "language": "typescript",
   "category": "import",
+  "coverage": ["imports"],
   "source": {
     "base": "export async function loadPlugin(name: string) {\n  return name;\n}\n",
     "left": "export async function loadPlugin(name: string) {\n  return import(`./plugins/${name}.js`);\n}\n",

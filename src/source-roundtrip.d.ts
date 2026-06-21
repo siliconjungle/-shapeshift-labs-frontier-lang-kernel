@@ -6,10 +6,14 @@ export type SourceRoundtripSegmentKind =
   | "comment"
   | "stringLiteral"
   | "templateLiteral"
+  | "decorator"
   | "importDeclaration"
   | "exportDeclaration"
   | "classDeclaration"
+  | "functionDeclaration"
   | "interfaceDeclaration"
+  | "typeAliasDeclaration"
+  | "jsxishText"
   | "identifier"
   | "punctuation"
   | "text";
@@ -18,12 +22,26 @@ export type SourceRoundtripFeatureKind =
   | "whitespace"
   | "comment"
   | "templateLiteral"
+  | "decorator"
   | "importDeclaration"
   | "exportDeclaration"
   | "classDeclaration"
+  | "functionDeclaration"
   | "interfaceDeclaration"
+  | "typeAliasDeclaration"
+  | "overloadDeclaration"
   | "classMember"
-  | "interfaceMember";
+  | "interfaceMember"
+  | "objectLiteral"
+  | "jsxishText"
+  | "malformedSnippet"
+  | "staleSnippet";
+
+export type SourceNoopRoundtripClassification = "safe" | "lossy" | "failed";
+
+export type SourceRoundtripDiagnosticKind = "malformed" | "stale" | "jsxish" | "emptySource" | string;
+
+export type SourceRoundtripDiagnosticSeverity = "info" | "warning" | "error";
 
 export interface SourceRoundtripSlice {
   readonly id: string;
@@ -32,6 +50,28 @@ export interface SourceRoundtripSlice {
   readonly end: number;
   readonly text: string;
   readonly parentId?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SourceRoundtripDiagnostic {
+  readonly id: string;
+  readonly kind: SourceRoundtripDiagnosticKind;
+  readonly severity: SourceRoundtripDiagnosticSeverity;
+  readonly message: string;
+  readonly start: number;
+  readonly end: number;
+  readonly featureId?: string;
+}
+
+export interface SourceRoundtripFeatureMetadata {
+  readonly featureKinds: readonly string[];
+  readonly lossyFeatureKinds: readonly string[];
+  readonly diagnosticKinds: readonly string[];
+  readonly diagnosticCount: number;
+  readonly warningCount: number;
+  readonly syntaxBalanced: boolean;
+  readonly staleMarkerCount: number;
+  readonly sourceBytePreservation: "segment-complete" | string;
 }
 
 export interface SourceRoundtripInput {
@@ -54,6 +94,8 @@ export interface SourceRoundtripScan {
   readonly segments: readonly SourceRoundtripSlice[];
   readonly features: readonly SourceRoundtripSlice[];
   readonly featureSummary: Readonly<Record<string, number>>;
+  readonly featureMetadata: SourceRoundtripFeatureMetadata;
+  readonly diagnostics: readonly SourceRoundtripDiagnostic[];
   readonly metadata?: JsonObject;
 }
 
@@ -85,6 +127,11 @@ export interface SourceNoopRoundtripReport {
   readonly sourceLength: number;
   readonly reconstructedLength: number;
   readonly issues: readonly string[];
+  readonly featureSummary: Readonly<Record<string, number>>;
+  readonly featureMetadata: SourceRoundtripFeatureMetadata;
+  readonly diagnostics: readonly SourceRoundtripDiagnostic[];
+  readonly classification: SourceNoopRoundtripClassification;
+  readonly classificationReasons: readonly string[];
   readonly firstDifference?: SourceRoundtripDifference;
   readonly evidence: EvidenceRecord;
 }

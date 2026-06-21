@@ -6,6 +6,7 @@ export * from "./document-validation.js";
 export * from "./evidence.js";
 export * from "./hashing.js";
 export * from "./js-ts-merge-contracts.js";
+export * from "./js-ts-safe-merge.js";
 export {
   classifyTopLevelJsTsDeclarationMerge,
   collectTopLevelJsTsDeclarations,

@@ -1,4 +1,9 @@
 import { uniqueEvidence } from "./evidence.js";
+import {
+  JS_TS_MERGE_CONFLICT_REASON_CODES,
+  createJsTsConflictSidecarRecord
+} from "./js-ts-merge-contracts.js";
+import { classifyJsTsSafeMergeApplyRecord } from "./js-ts-safe-merge.js";
 import { collectNativeAstSubtreeConflictKeys, collectSemanticSignatureConflictKeys } from "./merge-anchors.js";
 import { intersection, ordinalCompare, unique, uniqueById } from "./shared.js";
 
@@ -49,7 +54,12 @@ export const SEMANTIC_MERGE_ADMISSION_CONFLICT_REASON_CODES = Object.freeze([
   "semantic-merge.readiness-review",
   "semantic-merge.non-blocking-loss",
   "semantic-merge.competing-candidate",
-  "semantic-merge.external-conflict"
+  "semantic-merge.apply-gate-blocked-evidence",
+  "semantic-merge.apply-gate-stale",
+  "semantic-merge.apply-gate-no-op",
+  "semantic-merge.apply-gate-review",
+  "semantic-merge.external-conflict",
+  ...JS_TS_MERGE_CONFLICT_REASON_CODES
 ]);
 
 export const SEMANTIC_MERGE_DYNAMIC_EFFECTS = Object.freeze([
@@ -203,10 +213,15 @@ export function classifySemanticMergeCandidate(input, options = {}) {
   const admissionId = admissionOptions.id ?? `merge-admission:${candidate?.id ?? "unknown"}`;
   const conflictKeys = collectSemanticMergeAdmissionConflictKeys(candidate, admissionOptions);
   const conflictKeyKinds = collectSemanticMergeConflictKeyKinds(conflictKeys);
+  const jsTsSafeMergeApplyInputs = collectJsTsSafeMergeApplyInputs(candidate, admissionOptions);
+  const jsTsSafeMergeApplyEvidence = uniqueEvidence(jsTsSafeMergeApplyInputs.flatMap((record) =>
+    Array.isArray(record.evidence) ? record.evidence : []
+  ));
   const evidence = uniqueEvidence([
     ...(candidate?.evidence ?? []),
     ...(admissionOptions.evidence ?? []),
-    ...(admissionOptions.sourceMaps ?? []).flatMap((sourceMap) => sourceMap.evidence ?? [])
+    ...(admissionOptions.sourceMaps ?? []).flatMap((sourceMap) => sourceMap.evidence ?? []),
+    ...jsTsSafeMergeApplyEvidence
   ]);
   const losses = uniqueById(admissionOptions.losses ?? []);
   const failedEvidence = evidence.filter((record) => record.status === "failed");
@@ -219,12 +234,20 @@ export function classifySemanticMergeCandidate(input, options = {}) {
   const effectKeys = conflictKeys.filter((key) => semanticMergeConflictKeyKind(key) === "effect");
   const dynamicEffectKeys = effectKeys.filter((key) => SEMANTIC_MERGE_DYNAMIC_EFFECTS.includes(key.slice("effect:".length)));
   const jsTsContractAdmission = classifyJsTsMergeContracts({
+    admissionId,
     candidate,
     admissionOptions,
     conflictKeys,
     evidence,
     failedEvidence,
     passedEvidence
+  });
+  const jsTsApplyGateAdmission = classifyJsTsSafeMergeApplyAdmission({
+    admissionId,
+    candidate,
+    records: jsTsSafeMergeApplyInputs,
+    conflictKeys,
+    evidence
   });
   const blockers = [];
   const review = [];
@@ -381,6 +404,16 @@ export function classifySemanticMergeCandidate(input, options = {}) {
   blockers.push(...jsTsContractAdmission.blockers);
   review.push(...jsTsContractAdmission.review);
   notes.push(...jsTsContractAdmission.notes);
+  for (const conflict of jsTsContractAdmission.conflicts) {
+    conflicts.push(conflict);
+    if (conflict.severity === "error") blockers.push(conflict.reason);
+    else if (conflict.severity === "warning") review.push(conflict.reason);
+    else notes.push(conflict.reason);
+  }
+  blockers.push(...jsTsApplyGateAdmission.blockers);
+  review.push(...jsTsApplyGateAdmission.review);
+  notes.push(...jsTsApplyGateAdmission.notes);
+  conflicts.push(...jsTsApplyGateAdmission.conflicts);
   if (candidate?.readiness === "needs-review" || candidate?.readiness === "review-required") {
     const reason = "Candidate readiness requires review.";
     review.push(reason);
@@ -461,6 +494,12 @@ export function classifySemanticMergeCandidate(input, options = {}) {
       ...(jsTsContractAdmission.contracts.length > 0
         ? { jsTsMergeContracts: jsTsContractAdmission.contracts }
         : {}),
+      ...(jsTsApplyGateAdmission.records.length > 0
+        ? {
+          jsTsSafeMergeApplyRecords: jsTsApplyGateAdmission.records,
+          jsTsSafeMergeApplySummary: jsTsApplyGateAdmission.summary
+        }
+        : {}),
       ...(admissionOptions.metadata ?? {})
     }
   };
@@ -487,6 +526,7 @@ function classifyJsTsMergeContracts(input) {
   const blockers = [];
   const review = [];
   const notes = [];
+  const conflicts = [];
   const classifiedContracts = [];
 
   for (const [index, contract] of contracts.entries()) {
@@ -498,6 +538,15 @@ function classifyJsTsMergeContracts(input) {
     const contractId = contract.id ?? `js-ts-merge-contract:${index + 1}`;
     const contractKind = normalizeContractKind(contract);
     const status = normalizeContractStatus(contract);
+    const contractSidecars = normalizeJsTsContractConflictSidecars(contract);
+    const sidecarConflicts = contractSidecars.map((sidecar) => semanticMergeConflictFromJsTsSidecar({
+      admissionId: input.admissionId,
+      candidate: input.candidate,
+      contract,
+      contractId,
+      sidecar,
+      conflictKeys: input.conflictKeys
+    }));
     const contractBlockers = [];
     const contractReview = [];
     const requiredKinds = unique([
@@ -555,9 +604,19 @@ function classifyJsTsMergeContracts(input) {
     if (passedEvidenceIds.length === 0) {
       contractReview.push(`JS/TS merge contract ${contractId} has no passed evidence.`);
     }
+    for (const conflict of sidecarConflicts) {
+      if (conflict.severity === "error") {
+        contractBlockers.push(conflict.reason);
+      } else if (conflict.severity === "warning") {
+        contractReview.push(conflict.reason);
+      } else {
+        notes.push(conflict.reason);
+      }
+    }
 
     blockers.push(...contractBlockers);
     review.push(...contractReview);
+    conflicts.push(...sidecarConflicts);
     if (contractBlockers.length === 0 && contractReview.length === 0) {
       notes.push(`JS/TS merge contract ${contractId} satisfies safe ${contractKind} admission requirements.`);
     }
@@ -573,6 +632,7 @@ function classifyJsTsMergeContracts(input) {
       unknownEvidenceIds,
       failedEvidenceIds,
       passedEvidenceIds,
+      ...(contractSidecars.length > 0 ? { conflictSidecars: contractSidecars } : {}),
       reasons: unique([...contractBlockers, ...contractReview, ...stringList(contract.reasons)])
     });
   }
@@ -581,7 +641,236 @@ function classifyJsTsMergeContracts(input) {
     blockers: unique(blockers),
     review: unique(review),
     notes: unique(notes),
+    conflicts: sortSemanticMergeConflictSidecars(conflicts),
     contracts: classifiedContracts
+  };
+}
+
+function normalizeJsTsContractConflictSidecars(contract) {
+  const values = [
+    ...(Array.isArray(contract.conflictSidecars) ? contract.conflictSidecars : []),
+    ...(Array.isArray(contract.conflicts) ? contract.conflicts : [])
+  ].filter((sidecar) => sidecar && typeof sidecar === "object");
+  return uniqueById(values.map((sidecar) => createJsTsConflictSidecarRecord(sidecar)));
+}
+
+function semanticMergeConflictFromJsTsSidecar(input) {
+  const sidecar = input.sidecar;
+  const sideRecordIds = uniqueSortedStrings(sidecar.sides.flatMap((side) => side.recordId ? [side.recordId] : []));
+  const sideIdentities = uniqueSortedStrings(sidecar.sides.flatMap((side) => side.side ? [side.side] : []));
+  const sourceSpans = uniqueSourceSpans([
+    ...(sidecar.affectedSpans ?? []),
+    ...(sidecar.sourceSpans ?? []),
+    ...sidecar.sides.flatMap((side) => [
+      ...(side.sourceSpans ?? []),
+      side.sourceSpan
+    ])
+  ]);
+  const conflictKeys = uniqueSortedStrings(sidecar.conflictKeys ?? []);
+  const affectedContractIds = uniqueSortedStrings([
+    input.contractId,
+    sidecar.targetId,
+    ...sideRecordIds,
+    ...collectAffectedContractIds({ candidate: input.candidate, conflictKeys })
+  ]);
+  return createSemanticMergeConflictSidecar({
+    admissionId: input.admissionId,
+    code: sidecar.code ?? sidecar.reasonCode,
+    severity: sidecar.severity,
+    candidate: input.candidate,
+    candidateConflictKeys: input.conflictKeys,
+    conflictKeys,
+    affectedContractIds,
+    sourceSpans,
+    reason: jsTsConflictSidecarReason({ sidecar, contractId: input.contractId }),
+    remediationHints: sidecar.remediationHints,
+    metadata: {
+      jsTsMergeContractId: input.contractId,
+      jsTsConflictSidecarId: sidecar.id,
+      jsTsConflictTargetKind: sidecar.targetKind,
+      ...(sidecar.targetId ? { jsTsConflictTargetId: sidecar.targetId } : {}),
+      jsTsConflictSideIdentities: sideIdentities,
+      jsTsConflictSidecar: sidecar,
+      ...(input.contract.language ? { language: input.contract.language } : {}),
+      ...(input.contract.sourcePath ? { sourcePath: input.contract.sourcePath } : {})
+    }
+  });
+}
+
+function jsTsConflictSidecarReason(input) {
+  const target = input.sidecar.targetId
+    ? `${input.sidecar.targetKind} ${input.sidecar.targetId}`
+    : input.sidecar.targetKind;
+  if (input.sidecar.code === "js-ts.stale-source") {
+    return `JS/TS merge contract ${input.contractId} has stale source for ${target}.`;
+  }
+  if (input.sidecar.code === "js-ts.dynamic-import") {
+    return `JS/TS merge contract ${input.contractId} contains a dynamic import conflict for ${target}.`;
+  }
+  if (input.sidecar.code === "js-ts.duplicate-declaration") {
+    return `JS/TS merge contract ${input.contractId} has a duplicate declaration conflict for ${target}.`;
+  }
+  if (input.sidecar.code === "js-ts.duplicate-member") {
+    return `JS/TS merge contract ${input.contractId} has a duplicate member conflict for ${target}.`;
+  }
+  if (input.sidecar.code === "js-ts.computed-member") {
+    return `JS/TS merge contract ${input.contractId} contains a computed member conflict for ${target}.`;
+  }
+  if (input.sidecar.code === "js-ts.missing-span") {
+    return `JS/TS merge contract ${input.contractId} is missing source span evidence for ${target}.`;
+  }
+  return `JS/TS merge contract ${input.contractId} reports ${input.sidecar.code} for ${target}.`;
+}
+
+function classifyJsTsSafeMergeApplyAdmission(input) {
+  const blockers = [];
+  const review = [];
+  const notes = [];
+  const conflicts = [];
+  const records = [];
+
+  for (const record of input.records) {
+    const combinedEvidence = uniqueEvidence([
+      ...(input.evidence ?? []),
+      ...(Array.isArray(record.evidence) ? record.evidence : [])
+    ]);
+    const combinedConflictKeys = unique([
+      ...(input.conflictKeys ?? []),
+      ...stringList(record.conflictKeys)
+    ]).sort(ordinalCompare);
+    const classified = classifyJsTsSafeMergeApplyRecord({
+      candidateId: input.candidate?.id,
+      language: input.candidate?.language,
+      sourcePath: input.candidate?.sourcePath,
+      baseHash: input.candidate?.baseHash,
+      ...record,
+      evidence: combinedEvidence,
+      conflictKeys: combinedConflictKeys
+    });
+    records.push(classified);
+
+    if (classified.classification === "safe-apply") {
+      notes.push(`JS/TS safe-merge apply gate ${classified.id} accepts ${classified.safeCaseKind} changes.`);
+      continue;
+    }
+
+    const reason = classified.reasons[0] ?? `JS/TS safe-merge apply gate ${classified.id} is ${classified.classification}.`;
+    if (classified.classification === "review-required") {
+      review.push(reason);
+    } else {
+      blockers.push(reason);
+    }
+
+    conflicts.push(createSemanticMergeConflictSidecar({
+      admissionId: input.admissionId,
+      code: jsTsSafeMergeApplyConflictCode(classified.classification),
+      severity: jsTsSafeMergeApplyConflictSeverity(classified.classification),
+      candidate: input.candidate,
+      conflictKeys: classified.conflictKeys.length > 0 ? classified.conflictKeys : input.conflictKeys,
+      affectedContractIds: uniqueSortedStrings([
+        classified.id,
+        classified.candidateId,
+        ...classified.contractIds
+      ]),
+      sourceSpans: collectCandidateSourceSpans(input.candidate),
+      reason,
+      remediationHints: jsTsSafeMergeApplyRemediationHints(classified),
+      metadata: {
+        jsTsSafeMergeApplyRecordId: classified.id,
+        classification: classified.classification,
+        decision: classified.decision,
+        safeCaseKind: classified.safeCaseKind
+      }
+    }));
+  }
+
+  return {
+    blockers: unique(blockers),
+    review: unique(review),
+    notes: unique(notes),
+    conflicts,
+    records,
+    summary: jsTsSafeMergeApplySummary(records)
+  };
+}
+
+function collectJsTsSafeMergeApplyInputs(candidate, admissionOptions) {
+  return normalizeJsTsSafeMergeApplyInputs([
+    ...(admissionOptions.jsTsSafeMergeApplyRecords ?? []),
+    ...(admissionOptions.safeMergeApplyRecords ?? []),
+    ...(admissionOptions.applyGates ?? []),
+    ...objectValueList(admissionOptions.jsTsSafeMergeApplyRecord),
+    ...objectValueList(admissionOptions.safeMergeApplyRecord),
+    ...objectValueList(admissionOptions.applyGate),
+    ...metadataJsTsSafeMergeApplyInputs(candidate)
+  ]);
+}
+
+function metadataJsTsSafeMergeApplyInputs(candidate) {
+  const metadata = candidate?.metadata;
+  const values = [];
+  for (const key of ["jsTsSafeMergeApplyRecords", "jsTsSafeMergeApplyGates", "safeMergeApplyRecords", "applyGates"]) {
+    if (Array.isArray(metadata?.[key])) {
+      values.push(...metadata[key]);
+    }
+  }
+  for (const key of ["jsTsSafeMergeApplyRecord", "jsTsSafeMergeApplyGate", "safeMergeApplyRecord", "applyGate"]) {
+    if (metadata?.[key] && typeof metadata[key] === "object") {
+      values.push(metadata[key]);
+    }
+  }
+  return values;
+}
+
+function normalizeJsTsSafeMergeApplyInputs(values) {
+  return values.filter((value) => value && typeof value === "object");
+}
+
+function objectValueList(value) {
+  return value && typeof value === "object" ? [value] : [];
+}
+
+function jsTsSafeMergeApplyConflictCode(classification) {
+  if (classification === "blocked-evidence") return "semantic-merge.apply-gate-blocked-evidence";
+  if (classification === "stale") return "semantic-merge.apply-gate-stale";
+  if (classification === "no-op") return "semantic-merge.apply-gate-no-op";
+  return "semantic-merge.apply-gate-review";
+}
+
+function jsTsSafeMergeApplyConflictSeverity(classification) {
+  return classification === "blocked-evidence" || classification === "stale" ? "error" : "warning";
+}
+
+function jsTsSafeMergeApplyRemediationHints(record) {
+  if (record.classification === "blocked-evidence") {
+    return [remediationHint("rerun-evidence", "evidence", record.failedEvidenceIds)];
+  }
+  if (record.classification === "stale") {
+    return [remediationHint("rebase-candidate", "candidate", record.candidateId ? [record.candidateId] : [])];
+  }
+  if (record.classification === "no-op") {
+    return [remediationHint("drop-candidate", "candidate", record.candidateId ? [record.candidateId] : [])];
+  }
+  return [remediationHint("manual-review", "jsTsSafeMergeApplyRecord", [record.id])];
+}
+
+function jsTsSafeMergeApplySummary(records) {
+  const decisions = {
+    accept: 0,
+    reject: 0,
+    review: 0,
+    block: 0
+  };
+  const classifications = {};
+  for (const record of records) {
+    decisions[record.decision] = (decisions[record.decision] ?? 0) + 1;
+    classifications[record.classification] = (classifications[record.classification] ?? 0) + 1;
+  }
+  return {
+    total: records.length,
+    decisions,
+    classifications,
+    autoApplyable: records.length > 0 && records.every((record) => record.autoApplyable)
   };
 }
 

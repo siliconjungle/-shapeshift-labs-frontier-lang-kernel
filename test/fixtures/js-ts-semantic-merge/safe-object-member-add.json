@@ -1,0 +1,53 @@
+{
+  "kind": "frontier.lang.fixture.semanticMergeCase",
+  "version": 1,
+  "id": "safe-object-member-add",
+  "title": "Safe object member add",
+  "language": "javascript",
+  "category": "object-member",
+  "coverage": ["object-members", "safe-member-adds"],
+  "source": {
+    "base": "export const options = {\n  endpoint: '/api'\n};\n",
+    "left": "export const options = {\n  endpoint: '/api'\n};\n",
+    "right": "export const options = {\n  endpoint: '/api',\n  retries: 2\n};\n"
+  },
+  "expected": {
+    "outcome": "safe-object-member-add",
+    "decision": "safe",
+    "autoMergeable": true,
+    "summary": "Adding one object literal member against a no-op sibling is disjoint.",
+    "apply": { "classification": "safe-by-disjoint-region" },
+    "merge": {
+      "status": "safe-by-disjoint-region",
+      "overlappingNodeIds": [],
+      "overlappingRegions": [],
+      "overlappingEffects": []
+    }
+  },
+  "oracle": {
+    "kind": "patch-merge",
+    "baseDocument": {
+      "id": "fixture_safe_object_member_add",
+      "name": "SafeObjectMemberAdd",
+      "nodes": [
+        { "id": "type_options", "kind": "type", "name": "Options", "fields": [{ "id": "field_options_endpoint", "name": "endpoint", "type": "Text" }] }
+      ]
+    },
+    "leftPatch": { "id": "left_noop_for_object_member_add", "operations": [] },
+    "rightPatch": {
+      "id": "right_add_options_retries",
+      "operations": [
+        {
+          "op": "updateNode",
+          "id": "type_options",
+          "set": {
+            "fields": [
+              { "id": "field_options_endpoint", "name": "endpoint", "type": "Text" },
+              { "id": "field_options_retries", "name": "retries", "type": "Number" }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

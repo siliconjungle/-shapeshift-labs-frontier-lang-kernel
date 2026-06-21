@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {
+  JS_TS_MERGE_CONFLICT_REASON_CODES,
+  JS_TS_MERGE_CONFLICT_SEVERITIES,
   createJsTsConflictSidecarRecord,
   createJsTsMemberRecord,
   createJsTsMergeContractRecord,
@@ -8,6 +10,20 @@ import {
   createJsTsTriviaRecord,
   jsTsMergeContractConflictKeys
 } from '../../dist/index.js';
+
+assert.deepEqual(
+  [...JS_TS_MERGE_CONFLICT_REASON_CODES],
+  [
+    'js-ts.stale-source',
+    'js-ts.dynamic-import',
+    'js-ts.duplicate-declaration',
+    'js-ts.duplicate-member',
+    'js-ts.computed-member',
+    'js-ts.missing-span',
+    'js-ts.custom'
+  ]
+);
+assert.deepEqual([...JS_TS_MERGE_CONFLICT_SEVERITIES], ['info', 'warning', 'error']);
 
 const importRecord = createJsTsMergeImportRecord({
   importKind: 'type',
@@ -74,6 +90,7 @@ assert.equal(
 );
 
 const conflictSidecar = createJsTsConflictSidecarRecord({
+  code: 'js-ts.duplicate-member',
   conflictKind: 'signature',
   targetKind: 'member',
   targetId: memberRecord.id,
@@ -97,9 +114,42 @@ const conflictSidecar = createJsTsConflictSidecarRecord({
 });
 
 assert.equal(conflictSidecar.kind, 'frontier.lang.jsTsMergeConflictSidecar');
+assert.equal(conflictSidecar.code, 'js-ts.duplicate-member');
+assert.equal(conflictSidecar.reasonCode, 'js-ts.duplicate-member');
+assert.equal(conflictSidecar.severity, 'error');
 assert.equal(conflictSidecar.sides.length, 2);
+assert.equal(conflictSidecar.sides[0].side, 'left');
+assert.equal(conflictSidecar.sides[0].sourceSpans[0].path, 'src/todo.ts');
+assert.equal(conflictSidecar.affectedSpans.length, 1);
+assert.equal(conflictSidecar.affectedSpans[0].startLine, 4);
+assert.equal(conflictSidecar.remediationHints[0].action, 'rename-or-merge-member');
+assert.equal(conflictSidecar.remediationHints[0].target, 'member');
 assert.equal(conflictSidecar.evidenceIds[0], 'contract_conflict_scan');
 assert.equal(conflictSidecar.conflictKeys[0], 'js-ts:conflict:signature:member:member_title');
+
+const inferredConflictSidecars = [
+  createJsTsConflictSidecarRecord({ staleSource: true }),
+  createJsTsConflictSidecarRecord({ conflictKind: 'dynamic-import', targetKind: 'import' }),
+  createJsTsConflictSidecarRecord({ conflictKind: 'duplicate-declaration', targetKind: 'topLevelDeclaration' }),
+  createJsTsConflictSidecarRecord({ conflictKind: 'same-name-member', targetKind: 'member' }),
+  createJsTsConflictSidecarRecord({ conflictKind: 'computed-member', targetKind: 'member' }),
+  createJsTsConflictSidecarRecord({ conflictKind: 'missing-span', targetKind: 'sourceSpan' })
+];
+assert.deepEqual(
+  inferredConflictSidecars.map((sidecar) => sidecar.code),
+  [
+    'js-ts.stale-source',
+    'js-ts.dynamic-import',
+    'js-ts.duplicate-declaration',
+    'js-ts.duplicate-member',
+    'js-ts.computed-member',
+    'js-ts.missing-span'
+  ]
+);
+assert.deepEqual(
+  inferredConflictSidecars.map((sidecar) => sidecar.severity),
+  ['error', 'warning', 'error', 'error', 'warning', 'warning']
+);
 
 const contract = createJsTsMergeContractRecord({
   id: 'contract_src_todo_ts',

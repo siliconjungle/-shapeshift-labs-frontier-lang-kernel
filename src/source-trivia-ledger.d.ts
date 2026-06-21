@@ -27,6 +27,10 @@ export type SourceTriviaDeclarationKeyword =
   | "declare"
   | string;
 
+export type SourceTriviaImportKind = "value" | "type" | "sideEffect" | string;
+
+export type SourceTriviaMemberKind = "class" | "interface" | "type" | "object" | string;
+
 export interface SourceTriviaSpanRecord {
   readonly id: string;
   readonly kind: SourceTriviaSpanKind;
@@ -41,10 +45,49 @@ export interface SourceTriviaSpanRecord {
   readonly metadata?: JsonObject;
 }
 
+export interface SourceTriviaBoundaryRecord {
+  readonly id: string;
+  readonly kind: "source" | string;
+  readonly role: "boundary" | SourceTriviaSpanRole;
+  readonly span: SourceSpan;
+  readonly textHash: string;
+  readonly conflictKey: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SourceTriviaImportRecord {
+  readonly id: string;
+  readonly importKind: SourceTriviaImportKind;
+  readonly moduleSpecifier?: string;
+  readonly span: SourceSpan;
+  readonly leadingTriviaIds: readonly string[];
+  readonly trailingTriviaIds: readonly string[];
+  readonly adjacentTriviaIds: readonly string[];
+  readonly textHash: string;
+  readonly conflictKey: string;
+  readonly declarationId?: string;
+  readonly metadata?: JsonObject;
+}
+
 export interface SourceTriviaDeclarationRecord {
   readonly id: string;
   readonly keyword: SourceTriviaDeclarationKeyword;
   readonly name?: string;
+  readonly span: SourceSpan;
+  readonly leadingTriviaIds: readonly string[];
+  readonly trailingTriviaIds: readonly string[];
+  readonly adjacentTriviaIds: readonly string[];
+  readonly textHash: string;
+  readonly conflictKey: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface SourceTriviaMemberRecord {
+  readonly id: string;
+  readonly memberKind: SourceTriviaMemberKind;
+  readonly name?: string;
+  readonly ownerDeclarationId?: string;
+  readonly ownerName?: string;
   readonly span: SourceSpan;
   readonly leadingTriviaIds: readonly string[];
   readonly trailingTriviaIds: readonly string[];
@@ -64,9 +107,13 @@ export interface SourceTriviaLedgerRecord {
   readonly sourceHash: string;
   readonly sourceLength: number;
   readonly lineCount: number;
+  readonly sourceSpan?: SourceSpan;
+  readonly sourceBoundary?: SourceTriviaBoundaryRecord;
   readonly spans: readonly SourceTriviaSpanRecord[];
   readonly triviaSpans: readonly SourceTriviaSpanRecord[];
+  readonly imports?: readonly SourceTriviaImportRecord[];
   readonly declarations: readonly SourceTriviaDeclarationRecord[];
+  readonly members?: readonly SourceTriviaMemberRecord[];
   readonly conflictKeys: readonly string[];
   readonly metadata?: JsonObject;
 }
@@ -83,8 +130,11 @@ export interface CreateSourceTriviaLedgerInput {
 }
 
 export interface SourceTriviaConflictKeyOptions {
+  readonly includeSourceBoundary?: boolean;
   readonly includeSourceSpans?: boolean;
+  readonly includeImports?: boolean;
   readonly includeDeclarations?: boolean;
+  readonly includeMembers?: boolean;
 }
 
 export declare const SourceTriviaSpanKinds: readonly SourceTriviaSpanKind[];
@@ -94,7 +144,7 @@ export declare const SourceTriviaDeclarationKeywords: readonly SourceTriviaDecla
 export declare function createSourceTriviaLedger(input: CreateSourceTriviaLedgerInput): SourceTriviaLedgerRecord;
 
 export declare function collectSourceTriviaConflictKeys(
-  input: Pick<SourceTriviaLedgerRecord, "spans" | "declarations">,
+  input: Pick<SourceTriviaLedgerRecord, "spans" | "declarations"> & Partial<Pick<SourceTriviaLedgerRecord, "sourceBoundary" | "imports" | "members">>,
   options?: SourceTriviaConflictKeyOptions
 ): readonly string[];
 
@@ -112,6 +162,26 @@ export declare function sourceSpanConflictKey(record: {
 export declare function sourceDeclarationConflictKey(record: {
   readonly keyword: SourceTriviaDeclarationKeyword;
   readonly name?: string;
+  readonly span?: SourceSpan;
+  readonly sourceId?: string;
+  readonly sourcePath?: string;
+  readonly textHash?: string;
+}): string;
+
+export declare function sourceImportConflictKey(record: {
+  readonly importKind?: SourceTriviaImportKind;
+  readonly moduleSpecifier?: string;
+  readonly span?: SourceSpan;
+  readonly sourceId?: string;
+  readonly sourcePath?: string;
+  readonly textHash?: string;
+}): string;
+
+export declare function sourceMemberConflictKey(record: {
+  readonly memberKind?: SourceTriviaMemberKind;
+  readonly name?: string;
+  readonly ownerDeclarationId?: string;
+  readonly ownerName?: string;
   readonly span?: SourceSpan;
   readonly sourceId?: string;
   readonly sourcePath?: string;

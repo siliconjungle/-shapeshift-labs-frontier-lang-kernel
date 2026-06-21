@@ -5,16 +5,18 @@
   "title": "No-op roundtrip",
   "language": "javascript",
   "category": "roundtrip",
+  "coverage": [],
   "source": {
-    "base": "export const answer = 42;\n",
-    "left": "export const answer = 42;\n",
-    "right": "export const answer = 42;\n"
+    "base": "// no-op source keeps trivia and object bytes\nimport { helper } from \"./dep.js\";\n\nexport const answer = {\n  value: helper(42),\n  label: `answer:${42}`\n};\n",
+    "left": "// no-op source keeps trivia and object bytes\nimport { helper } from \"./dep.js\";\n\nexport const answer = {\n  value: helper(42),\n  label: `answer:${42}`\n};\n",
+    "right": "// no-op source keeps trivia and object bytes\nimport { helper } from \"./dep.js\";\n\nexport const answer = {\n  value: helper(42),\n  label: `answer:${42}`\n};\n"
   },
   "expected": {
     "outcome": "no-op-roundtrip",
     "decision": "safe",
     "autoMergeable": true,
     "summary": "Identical no-op branches preserve the source exactly.",
+    "apply": { "classification": "safe-by-same-change" },
     "merge": {
       "status": "safe-by-same-change",
       "overlappingNodeIds": [],

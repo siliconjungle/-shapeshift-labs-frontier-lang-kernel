@@ -1,4 +1,5 @@
 import {
+  JS_TS_MERGE_CONFLICT_REASON_CODES,
   createJsTsConflictSidecarRecord,
   createJsTsMemberRecord,
   createJsTsMergeContractRecord,
@@ -6,14 +7,20 @@ import {
   createJsTsTopLevelDeclarationRecord,
   createJsTsTriviaRecord,
   jsTsMergeContractConflictKeys,
+  type JsTsConflictReasonCode,
   type JsTsConflictSideRecord,
   type JsTsConflictSidecarRecord,
+  type JsTsConflictSeverity,
   type JsTsMemberRecord,
   type JsTsMergeContractRecord,
   type JsTsMergeImportRecord,
   type JsTsTopLevelDeclarationRecord,
   type JsTsTriviaRecord
 } from '../../dist/index.js';
+
+const knownReasonCodes: readonly JsTsConflictReasonCode[] = JS_TS_MERGE_CONFLICT_REASON_CODES;
+const duplicateMemberCode: JsTsConflictReasonCode = 'js-ts.duplicate-member';
+const blockingSeverity: JsTsConflictSeverity = 'error';
 
 const importRecord: JsTsMergeImportRecord = createJsTsMergeImportRecord({
   importKind: 'type',
@@ -53,10 +60,13 @@ const leftSide: JsTsConflictSideRecord = {
   side: 'left',
   recordId: memberRecord.id,
   sourceSpan: memberRecord.sourceSpan,
+  sourceSpans: memberRecord.sourceSpan ? [memberRecord.sourceSpan] : [],
   payload: { type: 'string' }
 };
 
 const conflictSidecar: JsTsConflictSidecarRecord = createJsTsConflictSidecarRecord({
+  code: duplicateMemberCode,
+  severity: blockingSeverity,
   conflictKind: 'signature',
   targetKind: 'member',
   targetId: memberRecord.id,
@@ -74,9 +84,13 @@ const conflictSidecar: JsTsConflictSidecarRecord = createJsTsConflictSidecarReco
 
 const contract: JsTsMergeContractRecord = createJsTsMergeContractRecord({
   id: 'contract_src_todo_ts',
+  contractKind: 'member',
   language: 'typescript',
   sourcePath: 'src/todo.ts',
   sourceHash: 'fnv1a32:source',
+  safe: true,
+  requiredEvidenceIds: ['contract_conflict_scan'],
+  requiredConflictKeyKinds: ['symbol'],
   imports: [importRecord],
   topLevelDeclarations: [declarationRecord],
   members: [memberRecord],
@@ -95,5 +109,13 @@ visibleImport.moduleSpecifier?.toUpperCase();
 visibleDeclaration.name?.toUpperCase();
 visibleMember.name?.toUpperCase();
 visibleTrivia.textHash?.toUpperCase();
+contract.contractKind?.toUpperCase();
+contract.requiredEvidenceIds?.includes('contract_conflict_scan');
+visibleConflict.code.toUpperCase();
+visibleConflict.reasonCode.toUpperCase();
+visibleConflict.severity.toUpperCase();
+visibleConflict.affectedSpans[0]?.path?.toUpperCase();
+visibleConflict.remediationHints[0]?.action.toUpperCase();
 visibleConflict.sides[0].side.toUpperCase();
+knownReasonCodes.includes('js-ts.missing-span');
 visibleKeys.includes('js-ts:conflict:signature:member:member_title');

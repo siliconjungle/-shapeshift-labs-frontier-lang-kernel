@@ -265,11 +265,22 @@ const contract = createJsTsMergeContractRecord({
   topLevelDeclarations: [{ declarationKind: 'interface', name: 'Todo', memberIds: ['member_title'] }],
   members: [{ id: 'member_title', ownerDeclarationId: 'js-ts-declaration:Todo', memberKind: 'property', name: 'title' }],
   trivia: [{ triviaKind: 'blockComment', placement: 'leading', attachedToId: 'js-ts-declaration:Todo' }],
-  conflictSidecars: [{ conflictKind: 'signature', targetKind: 'member', targetId: 'member_title', sides: [{ side: 'left' }, { side: 'right' }] }]
+  conflictSidecars: [{
+    code: 'js-ts.duplicate-member',
+    severity: 'error',
+    conflictKind: 'signature',
+    targetKind: 'member',
+    targetId: 'member_title',
+    affectedSpans: [{ path: 'src/todo.ts', startLine: 4, startColumn: 3, endLine: 4, endColumn: 17 }],
+    sides: [{ side: 'left' }, { side: 'right' }],
+    remediationHints: [{ action: 'rename-or-merge-member', target: 'member', targetIds: ['member_title'] }]
+  }]
 });
 
 console.log(contract.conflictKeys); // import/declaration/member/trivia/conflict keys
 ```
+
+The JS/TS semantic merge E2E smoke oracle runs the fixture corpus through source roundtrip scans, trivia ledgers, patch merge admission, semantic candidate admission, and conflict sidecars. It proves mixed swarm outputs drain to explicit terminal states: safe semantic patches are applied through patch replay, no-op outputs are rejected without source edits, stale no-ops are rerun and rejected, and genuine declaration/member conflicts remain review-required with sidecar evidence.
 
 ## Semantic Operations
 Semantic operations describe reviewable program behavior, ownership, effects, and projection work in a language-neutral shape for swarm admission queues:

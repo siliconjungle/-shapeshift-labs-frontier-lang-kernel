@@ -5,6 +5,7 @@
   "title": "Safe interface member add",
   "language": "typescript",
   "category": "member",
+  "coverage": ["interfaces", "safe-member-adds"],
   "source": {
     "base": "export interface Profile {\n  id: string;\n}\n",
     "left": "export interface Profile {\n  id: string;\n}\n",
@@ -15,6 +16,7 @@
     "decision": "safe",
     "autoMergeable": true,
     "summary": "Adding one concrete member against a no-op sibling is disjoint.",
+    "apply": { "classification": "safe-by-disjoint-region" },
     "merge": {
       "status": "safe-by-disjoint-region",
       "overlappingNodeIds": [],
