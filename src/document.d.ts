@@ -61,10 +61,56 @@ export interface ActionNode extends BaseNode {
   readonly body?: readonly JsonObject[];
 }
 
+export interface ViewPropDeclaration {
+  readonly id: SemanticId;
+  readonly name: string;
+  readonly type?: TypeExpression;
+  readonly optional?: boolean;
+  readonly metadata?: JsonObject;
+}
+
+export interface ViewEventDeclaration {
+  readonly id: SemanticId;
+  readonly name: string;
+  readonly action?: SemanticId | string;
+  readonly input?: TypeExpression;
+  readonly metadata?: JsonObject;
+}
+
+export interface ViewRenderProperty {
+  readonly name: string;
+  readonly value?: JsonValue;
+  readonly expression?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface ViewRenderEvent {
+  readonly name: string;
+  readonly action?: SemanticId | string;
+  readonly handler?: string;
+  readonly metadata?: JsonObject;
+}
+
+export interface ViewRenderNode {
+  readonly id: SemanticId;
+  readonly kind: "element" | "component" | "text" | string;
+  readonly tagName?: string;
+  readonly component?: string;
+  readonly identityKey?: string;
+  readonly text?: string;
+  readonly props?: readonly ViewRenderProperty[];
+  readonly events?: readonly ViewRenderEvent[];
+  readonly children?: readonly SemanticId[];
+  readonly metadata?: JsonObject;
+}
+
 export interface ViewNode extends BaseNode {
   readonly kind: "view";
   readonly reads?: readonly string[];
   readonly dispatches?: readonly string[];
+  readonly props?: readonly ViewPropDeclaration[];
+  readonly events?: readonly ViewEventDeclaration[];
+  readonly renders?: readonly ViewRenderNode[];
 }
 
 export interface MigrationNode extends BaseNode {

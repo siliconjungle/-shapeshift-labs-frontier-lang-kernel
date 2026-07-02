@@ -9,7 +9,8 @@ import {
   externNode,
   latticeNode,
   nativeSourceNode,
-  typeNode
+  typeNode,
+  viewNode
 } from '../../dist/index.js';
 
 export function createTodoKernelFixture() {
@@ -63,6 +64,23 @@ export function createTodoKernelFixture() {
     returns: 'Json',
     resources: ['network']
   });
+  const todoListView = viewNode({
+    id: 'view_todo_list',
+    name: 'TodoList',
+    reads: ['TodoDb.todos'],
+    dispatches: ['action_add'],
+    props: [{ id: 'view_prop_disabled', name: 'disabled', type: 'Boolean' }],
+    events: [{ id: 'view_event_save', name: 'save', action: 'action_add', input: 'TodoInput' }],
+    renders: [{
+      id: 'render_save_button',
+      kind: 'element',
+      tagName: 'Button',
+      identityKey: 'save',
+      text: 'Save',
+      props: [{ name: 'disabled', expression: 'disabled' }],
+      events: [{ name: 'press', action: 'save' }]
+    }]
+  });
   const nativeAst = createNativeAstRecord({
     id: 'native_ts_todo',
     language: 'typescript',
@@ -107,7 +125,7 @@ export function createTodoKernelFixture() {
     frontierNodeIds: ['ent_todo'],
     losses: nativeAst.losses
   });
-  const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, httpRequest, fetchTodo, todo, nativeTodo] });
+  const document = createDocument({ id: 'mod_todo', name: 'TodoApp', nodes: [tagSet, todoType, saveTodo, httpRequest, fetchTodo, todoListView, todo, nativeTodo] });
   const semanticIndex = createSemanticIndexRecord({
     id: 'index_todo',
     repository: { rootUri: 'file:///repo', commit: 'abc123' },
@@ -174,6 +192,7 @@ export function createTodoKernelFixture() {
     sourceMap,
     tagSet,
     todo,
+    todoListView,
     todoType
   };
 }
