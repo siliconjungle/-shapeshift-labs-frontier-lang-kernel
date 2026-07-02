@@ -1,4 +1,5 @@
 import { collectParadigmRecords } from "./paradigm-records.js";
+import { collectDocumentSemanticIds } from "./document-semantic-ids.js";
 import { uniqueById } from "./shared.js";
 import { collectUniversalAstLayerRecords } from "./universal-ast-records.js";
 
@@ -53,7 +54,7 @@ export function createUniversalAstReferenceIndex(context = {}) {
     nativeSourceIds: new Set(nativeSources.map((source) => source.id).filter(Boolean)),
     nativeAstIds: new Set(nativeAsts.map((nativeAst) => nativeAst.id).filter(Boolean)),
     nativeAstNodeIds: new Set(nativeAsts.flatMap((nativeAst) => Object.keys(nativeAst.nodes ?? {}))),
-    semanticNodeIds: new Set(Object.keys(document?.nodes ?? {})),
+    semanticNodeIds: collectDocumentSemanticIds(document),
     semanticIndexIds: new Set([semanticIndex?.id].filter(Boolean)),
     semanticSymbolIds: new Set((semanticIndex?.symbols ?? []).map((symbol) => symbol.id)),
     semanticOccurrenceIds: new Set((semanticIndex?.occurrences ?? []).map((occurrence) => occurrence.id)),

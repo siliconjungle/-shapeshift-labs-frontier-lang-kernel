@@ -51,6 +51,34 @@ const partialUniversalAst = createUniversalAstEnvelope({
 });
 assert.deepEqual(validateUniversalAstEnvelope(partialUniversalAst), []);
 
+const nestedFieldSourceMap = {
+  ...sourceMap,
+  id: 'sourcemap_todo_title_field',
+  mappings: [{
+    ...sourceMap.mappings[0],
+    id: 'map_todo_title_field',
+    semanticNodeId: 'field_title'
+  }]
+};
+const nestedSemanticNodeEnvelope = createUniversalAstEnvelope({
+  id: 'uast_nested_semantic_node',
+  document,
+  semanticIndex,
+  sourceMaps: [nestedFieldSourceMap],
+  layers: {
+    dataFlow: createUniversalAstLayer({
+      id: 'layer_nested_field_data_flow',
+      layer: 'dataFlow',
+      semanticNodeIds: ['field_title'],
+      graph: {
+        nodes: [{ id: 'df_title_field', kind: 'field', semanticNodeId: 'field_title' }],
+        edges: []
+      }
+    })
+  }
+});
+assert.deepEqual(validateUniversalAstEnvelope(nestedSemanticNodeEnvelope), []);
+
 const brokenLayerEnvelope = createUniversalAstEnvelope({
   id: 'uast_broken_layers',
   document,

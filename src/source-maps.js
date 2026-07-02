@@ -1,4 +1,5 @@
 import { collectLinkedSourcePreservationEvidence, uniqueEvidence } from "./evidence.js";
+import { collectDocumentSemanticIds } from "./document-semantic-ids.js";
 import { collectLinkedSourcePreservationLosses, collectNativeAstNodeIds, collectNativeSourceIds, explainSourcePreservationReasons, inferSourcePreservationLevel, validateSourceMapMappingPrecision } from "./source-map-helpers.js";
 import { unique, uniqueById, validateSourceSpan } from "./shared.js";
 
@@ -83,7 +84,7 @@ export function validateSourceMapRecord(sourceMap, context = {}) {
     issues.push("Source map is missing id");
   }
 
-  const documentNodeIds = new Set(Object.keys(context.document?.nodes ?? {}));
+  const documentNodeIds = collectDocumentSemanticIds(context.document);
   const nativeSourceIds = collectNativeSourceIds(context.document, context.nativeSources);
   const nativeAstNodeIds = collectNativeAstNodeIds(context.nativeAst, context.nativeSources);
   const symbolIds = new Set((context.semanticIndex?.symbols ?? []).map((symbol) => symbol.id));
